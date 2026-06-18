@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+
+  decks        Deck[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Deck {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  language    String   @default("ja")
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cards       Card[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("decks")
+}
+
+model Card {
+  id              String        @id @default(cuid())
+
+  question        String
+  answer          String
+  tags            String[]      @default([])
+
+  sourceType      String?
+  sourceUrl       String?
+  contextSentence String?
+
+  deckId          String
+  deck            Deck          @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  schedule        CardSchedule?
+  reviewLogs      ReviewLog[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([deckId])
+  @@map("cards")
+}
+
+model CardSchedule {
+  id           String   @id @default(cuid())
+
+  cardId       String   @unique
+  card         Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  dueDate      DateTime @default(now())
+  lastReviewAt DateTime?
+
+  stability    Float    @default(0)
+  difficulty   Float    @default(5)
+  reps         Int      @default(0)
+  lapses       Int      @default(0)
+  state        String   @default("new")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([dueDate])
+  @@index([cardId])
+  @@map("card_schedules")
+}
+
+model ReviewLog {
+  id         String   @id @default(cuid())
+
+  cardId     String
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  rating     Int
+  duration   Int
+
+  reviewedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([cardId])
+  @@index([reviewedAt])
+  @@index([createdAt])
+  @@map("review_logs")
+}
