@@ -1,84 +1,184 @@
 /**
- * JMdict importer — pipeline scaffold.
+ * Production JMdict importer (jmdict-simplified JSON format).
  *
- * This script is intentionally decoupled from any specific dataset format.
- * The flow is: SOURCE → parse → NormalizedEntry[] → bulk upsert.
+ * Pipeline:  file -> parse words[] -> normalize -> merge(word+reading)
+ *            -> batched chunked upsert (skipDuplicates) -> progress logging
  *
- * For now it ships with a small built-in SAMPLE_ENTRIES set so the dictionary
- * API can be tested end-to-end. To import the real JMdict later, implement
- * `parseJmdict()` to read the downloaded JMdict file and return NormalizedEntry[].
- * The rest of the pipeline (chunked insert, dedupe) stays unchanged.
+ * Design notes (see Phase 10 / Section 11):
+ *  - Stores ONLY the fields the app uses; raw XML/editor metadata is stripped.
+ *  - Merges entries sharing the same word+reading so meanings aren't duplicated
+ *    across rows.
+ *  - Derives `commonWord` from JMdict priority flags; `frequency`/`jlptLevel`
+ *    are left null and intended to be filled by future overlay imports
+ *    (frequency lists, JLPT lists) WITHOUT a full re-import.
+ *  - Resume-safe: a unique (word,reading) constraint + createMany skipDuplicates
+ *    means re-running continues where it left off instead of erroring.
  *
  * Usage:
- *   npx tsx scripts/import-jmdict.ts            # imports SAMPLE_ENTRIES
- *   npx tsx scripts/import-jmdict.ts --file x   # (future) import from a file
+ *   npm run import:jmdict            # common entries only (~22k) - default
+ *   npm run import:jmdict -- --full  # full dataset (~217k)
+ *   npm run import:jmdict -- --fresh # wipe jmdict rows first, then import
+ *   npm run import:jmdict -- --file path/to/jmdict-eng.json
  */
 import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import type { NormalizedEntry } from "../src/modules/dictionary/dictionary.types.js";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL });
 const db = new PrismaClient({ adapter });
 
-const CHUNK_SIZE = 500;
+const CHUNK_SIZE = 1000;
+const DEFAULT_FILE = path.resolve(process.cwd(), "data/jmdict-eng.json");
 
-// ── Sample data (replace with real JMdict parse later) ───────────────────────
-const SAMPLE_ENTRIES: NormalizedEntry[] = [
-  { word: "犬", reading: "いぬ", meanings: ["dog"], jlptLevel: "N5", partOfSpeech: "noun", frequency: 124 },
-  { word: "猫", reading: "ねこ", meanings: ["cat"], jlptLevel: "N5", partOfSpeech: "noun", frequency: 198 },
-  { word: "水", reading: "みず", meanings: ["water"], jlptLevel: "N5", partOfSpeech: "noun", frequency: 87 },
-  { word: "食べる", reading: "たべる", meanings: ["to eat"], jlptLevel: "N5", partOfSpeech: "ichidan verb", frequency: 65 },
-  { word: "学校", reading: "がっこう", meanings: ["school"], jlptLevel: "N5", partOfSpeech: "noun", frequency: 142 },
-  { word: "勉強", reading: "べんきょう", meanings: ["study", "diligence"], jlptLevel: "N5", partOfSpeech: "noun, suru verb", frequency: 210 },
-  { word: "約束", reading: "やくそく", meanings: ["promise", "appointment", "arrangement"], jlptLevel: "N4", partOfSpeech: "noun, suru verb", frequency: 540 },
-  { word: "経験", reading: "けいけん", meanings: ["experience"], jlptLevel: "N4", partOfSpeech: "noun, suru verb", frequency: 380 },
-  { word: "成長", reading: "せいちょう", meanings: ["growth", "development"], jlptLevel: "N3", partOfSpeech: "noun, suru verb", frequency: 610 },
-  { word: "影響", reading: "えいきょう", meanings: ["influence", "effect"], jlptLevel: "N3", partOfSpeech: "noun, suru verb", frequency: 295 },
-  { word: "改善", reading: "かいぜん", meanings: ["improvement", "betterment"], jlptLevel: "N2", partOfSpeech: "noun, suru verb", frequency: 720 },
-  { word: "傾向", reading: "けいこう", meanings: ["tendency", "trend", "inclination"], jlptLevel: "N2", partOfSpeech: "noun", frequency: 880 },
-  { word: "曖昧", reading: "あいまい", meanings: ["vague", "ambiguous", "unclear"], jlptLevel: "N1", partOfSpeech: "na-adjective", frequency: 1320 },
-  { word: "顕著", reading: "けんちょ", meanings: ["remarkable", "striking", "conspicuous"], jlptLevel: "N1", partOfSpeech: "na-adjective", frequency: 2100 },
-];
-
-/**
- * Future: parse the real JMdict dataset into NormalizedEntry[].
- * Not implemented yet — datasets are not downloaded automatically.
- */
-export function parseJmdict(_filePath: string): NormalizedEntry[] {
-  throw new Error(
-    "parseJmdict() not implemented yet. Download JMdict and implement parsing here."
-  );
+// ── JMdict-simplified types (only what we read) ──────────────────────────────
+interface JmdictKanji { common: boolean; text: string }
+interface JmdictKana { common: boolean; text: string }
+interface JmdictGloss { lang: string; text: string }
+interface JmdictSense { partOfSpeech: string[]; gloss: JmdictGloss[] }
+interface JmdictWord {
+  kanji: JmdictKanji[];
+  kana: JmdictKana[];
+  sense: JmdictSense[];
 }
 
-async function importEntries(entries: NormalizedEntry[]): Promise<number> {
-  let inserted = 0;
-  for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
-    const chunk = entries.slice(i, i + CHUNK_SIZE);
-    const result = await db.dictionaryEntry.createMany({
-      data: chunk.map((e) => ({
-        word: e.word,
-        reading: e.reading ?? null,
-        meanings: e.meanings,
-        jlptLevel: e.jlptLevel ?? null,
-        partOfSpeech: e.partOfSpeech ?? null,
-        frequency: e.frequency ?? null,
-      })),
-    });
-    inserted += result.count;
-    console.log(`  Imported ${inserted}/${entries.length}…`);
-  }
-  return inserted;
+interface Row {
+  word: string;
+  reading: string | null;
+  meanings: string[];
+  partOfSpeech: string | null;
+  commonWord: boolean;
+}
+
+// POS abbreviation -> readable label (most frequent ones; falls back to raw).
+const POS_LABELS: Record<string, string> = {
+  n: "noun", "n-pref": "noun (prefix)", "n-suf": "noun (suffix)",
+  pn: "pronoun", "adj-i": "i-adjective",
+  "adj-na": "na-adjective", "adj-no": "no-adjective", adv: "adverb",
+  vs: "suru verb", vt: "transitive verb", vi: "intransitive verb",
+  v1: "ichidan verb", v5r: "godan verb", v5s: "godan verb",
+  v5k: "godan verb", v5u: "godan verb", v5g: "godan verb", v5b: "godan verb",
+  v5m: "godan verb", v5n: "godan verb", v5t: "godan verb",
+  exp: "expression", int: "interjection", conj: "conjunction",
+  prt: "particle", aux: "auxiliary", "aux-v": "auxiliary verb",
+  ctr: "counter", pref: "prefix", suf: "suffix",
+};
+
+function labelPos(codes: string[]): string | null {
+  if (!codes || codes.length === 0) return null;
+  const labels = codes.map((c) => POS_LABELS[c] ?? c);
+  return [...new Set(labels)].join(", ");
+}
+
+function normalize(w: JmdictWord): Row | null {
+  const commonWord =
+    w.kanji.some((k) => k.common) || w.kana.some((k) => k.common);
+
+  // word = primary kanji form, or kana when there is no kanji (kana-only entry)
+  const word = w.kanji[0]?.text ?? w.kana[0]?.text;
+  if (!word) return null;
+
+  // reading = primary kana; null when the headword is itself kana
+  const reading = w.kanji.length > 0 ? (w.kana[0]?.text ?? null) : null;
+
+  const meanings = [
+    ...new Set(
+      w.sense.flatMap((s) =>
+        s.gloss.filter((g) => g.lang === "eng").map((g) => g.text)
+      )
+    ),
+  ];
+  if (meanings.length === 0) return null;
+
+  const partOfSpeech = labelPos(w.sense[0]?.partOfSpeech ?? []);
+
+  return { word, reading, meanings, partOfSpeech, commonWord };
+}
+
+async function insertChunk(rows: Row[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const result = await db.dictionaryEntry.createMany({
+    data: rows.map((r) => ({
+      word: r.word,
+      reading: r.reading,
+      meanings: r.meanings,
+      partOfSpeech: r.partOfSpeech,
+      commonWord: r.commonWord,
+      source: "jmdict",
+    })),
+    skipDuplicates: true,
+  });
+  return result.count;
 }
 
 async function main() {
-  const fileArg = process.argv.indexOf("--file");
-  const entries =
-    fileArg !== -1 ? parseJmdict(process.argv[fileArg + 1]) : SAMPLE_ENTRIES;
+  const argv = process.argv.slice(2);
+  const full = argv.includes("--full");
+  const fresh = argv.includes("--fresh");
+  const fileIdx = argv.indexOf("--file");
+  const file = fileIdx !== -1 ? argv[fileIdx + 1] : DEFAULT_FILE;
 
-  console.log(`Starting dictionary import (${entries.length} entries)…`);
-  const count = await importEntries(entries);
-  console.log(`✅ Done. Imported ${count} dictionary entries.`);
+  if (!fs.existsSync(file)) {
+    console.error(`Dataset not found at: ${file}`);
+    console.error("Download it first (see README) or pass --file <path>.");
+    process.exit(1);
+  }
+
+  if (fresh) {
+    console.log("Wiping existing jmdict entries...");
+    const del = await db.dictionaryEntry.deleteMany({ where: { source: "jmdict" } });
+    console.log(`  Removed ${del.count} rows.`);
+  }
+
+  console.log(`Importing from ${file} (${full ? "FULL" : "common-only"})...`);
+
+  // Merge map keyed by word+reading so duplicate rows are collapsed and their
+  // meanings combined before we ever touch the database.
+  const merged = new Map<string, Row>();
+  let seen = 0;
+  let skippedNonCommon = 0;
+
+  console.log("Reading dataset into memory...");
+  const data = JSON.parse(fs.readFileSync(file, "utf8")) as { words: JmdictWord[] };
+
+  for (const value of data.words) {
+    seen++;
+    const row = normalize(value);
+    if (!row) continue;
+    if (!full && !row.commonWord) { skippedNonCommon++; continue; }
+
+    const key = `${row.word} ${row.reading ?? ""}`;
+    const existing = merged.get(key);
+    if (existing) {
+      existing.meanings = [...new Set([...existing.meanings, ...row.meanings])];
+      existing.commonWord = existing.commonWord || row.commonWord;
+    } else {
+      merged.set(key, row);
+    }
+
+    if (seen % 50000 === 0) console.log(`  Parsed ${seen} entries...`);
+  }
+
+  console.log(`Parsed ${seen} entries -> ${merged.size} unique rows to import.`);
+
+  // Chunked batch insert
+  const rows = [...merged.values()];
+  let inserted = 0;
+  let dupes = 0;
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    const count = await insertChunk(chunk);
+    inserted += count;
+    dupes += chunk.length - count;
+    console.log(`  Imported ${inserted}/${rows.length}...`);
+  }
+
+  console.log("");
+  console.log(`Imported: ${inserted} entries`);
+  console.log(`Skipped duplicates: ${dupes}`);
+  if (!full) console.log(`Skipped non-common: ${skippedNonCommon}`);
+  console.log("Completed successfully");
   await db.$disconnect();
 }
 

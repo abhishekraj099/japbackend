@@ -6,6 +6,7 @@ export interface DictionaryResult {
   jlptLevel: string | null;
   partOfSpeech: string | null;
   frequency: number | null;
+  commonWord: boolean;
 }
 
 /**

@@ -116,13 +116,18 @@ model DictionaryEntry {
   reading      String?
   meanings     String[] @default([])
   jlptLevel    String?
-  partOfSpeech String?
   frequency    Int?
+  partOfSpeech String?
+  priority     Int?
+  commonWord   Boolean  @default(false)
+  source       String   @default("jmdict")
 
   createdAt    DateTime @default(now())
 
+  @@unique([word, reading])
   @@index([word])
   @@index([reading])
   @@index([jlptLevel])
+  @@index([commonWord, frequency])
   @@map("dictionary_entries")
 }

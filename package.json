@@ -13,7 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "import:dict": "tsx scripts/import-jmdict.ts"
+    "import:jmdict": "tsx scripts/import-jmdict.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
