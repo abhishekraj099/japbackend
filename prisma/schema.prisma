@@ -128,6 +128,8 @@ model DictionaryEntry {
   @@index([word])
   @@index([reading])
   @@index([jlptLevel])
+  @@index([commonWord])
+  @@index([frequency])
   @@index([commonWord, frequency])
   @@map("dictionary_entries")
 }
