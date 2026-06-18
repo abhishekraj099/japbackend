@@ -108,3 +108,21 @@ model ReviewLog {
   @@index([createdAt])
   @@map("review_logs")
 }
+
+model DictionaryEntry {
+  id           String   @id @default(cuid())
+
+  word         String
+  reading      String?
+  meanings     String[] @default([])
+  jlptLevel    String?
+  partOfSpeech String?
+  frequency    Int?
+
+  createdAt    DateTime @default(now())
+
+  @@index([word])
+  @@index([reading])
+  @@index([jlptLevel])
+  @@map("dictionary_entries")
+}

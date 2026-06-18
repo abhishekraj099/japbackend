@@ -9,6 +9,7 @@ import { userRoutes } from "./modules/users/user.routes.js";
 import { deckRoutes } from "./modules/decks/deck.routes.js";
 import { cardRoutes } from "./modules/cards/card.routes.js";
 import { reviewRoutes } from "./modules/reviews/review.routes.js";
+import { dictionaryRoutes } from "./modules/dictionary/dictionary.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -27,6 +28,7 @@ export const createApp = () => {
   app.use("/api/decks", deckRoutes);
   app.use("/api/cards", cardRoutes);
   app.use("/api/reviews", reviewRoutes);
+  app.use("/api/dictionary", dictionaryRoutes);
 
   app.use((req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });
