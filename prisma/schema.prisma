@@ -45,6 +45,12 @@ model Card {
   answer          String
   tags            String[]      @default([])
 
+  reading         String?
+  meaning         String?
+  grammarNotes    String?
+  jlptLevel       String?
+  frequency       Int?
+
   sourceType      String?
   sourceUrl       String?
   contextSentence String?

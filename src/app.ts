@@ -13,7 +13,8 @@ import { reviewRoutes } from "./modules/reviews/review.routes.js";
 export const createApp = () => {
   const app = express();
 
-  app.use(cors({ origin: env.CORS_ORIGIN }));
+  const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
+  app.use(cors({ origin: allowedOrigins }));
   app.use(express.json());
   app.use(apiLimiter);
 

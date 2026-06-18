@@ -8,7 +8,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRE: z.string().default("7d"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
-  CORS_ORIGIN: z.string().url().default("http://localhost:3001"),
+  CORS_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
 export const env = envSchema.parse(process.env);

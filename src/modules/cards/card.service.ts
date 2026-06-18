@@ -12,15 +12,11 @@ export class CardService {
       throw new AppError(404, "Deck not found", "DECK_NOT_FOUND");
     }
 
+    const { tags, ...rest } = input;
     return await db.card.create({
       data: {
-        deckId: input.deckId,
-        question: input.question,
-        answer: input.answer,
-        tags: input.tags || [],
-        sourceType: input.sourceType,
-        sourceUrl: input.sourceUrl,
-        contextSentence: input.contextSentence,
+        ...rest,
+        tags: tags || [],
         schedule: {
           create: {},
         },
