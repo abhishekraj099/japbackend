@@ -4,6 +4,7 @@ import {
   CreateCardInput,
   UpdateCardInput,
   CreateGrammarCardInput,
+  CreateSentenceCardInput,
 } from "./card.schema.js";
 
 const cardService = new CardService();
@@ -32,6 +33,22 @@ export const getSavedGrammar = async (
   try {
     const patternIds = await cardService.getSavedGrammarPatternIds(req.user!.id);
     res.json({ patternIds });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createSentence = async (
+  req: Request<{}, {}, CreateSentenceCardInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { card, alreadySaved } = await cardService.createSentence(
+      req.user!.id,
+      req.body
+    );
+    res.status(alreadySaved ? 200 : 201).json({ card, alreadySaved });
   } catch (error) {
     next(error);
   }

@@ -4,6 +4,7 @@ import {
   CreateCardInput,
   UpdateCardInput,
   CreateGrammarCardInput,
+  CreateSentenceCardInput,
 } from "./card.schema.js";
 
 export class CardService {
@@ -138,6 +139,43 @@ export class CardService {
         sourceType: input.sourceUrl ? "web" : undefined,
         contextSentence: input.contextSentence,
         tags: ["grammar"],
+        schedule: { create: {} },
+      },
+    });
+    return { card, alreadySaved: false };
+  }
+
+  /**
+   * Create a sentence flashcard on the shared Card table (cardType "sentence").
+   * Idempotent per (user, sentenceText): if the same sentence is already saved
+   * in any of the user's decks, the existing card is returned with
+   * `alreadySaved: true` instead of inserting a duplicate — mirroring the
+   * vocabulary and grammar dedup.
+   */
+  async createSentence(userId: string, input: CreateSentenceCardInput) {
+    const deck = await this.resolveDeck(userId, input.deckId);
+
+    const existing = await db.card.findFirst({
+      where: {
+        cardType: "sentence",
+        question: input.sentenceText,
+        deck: { userId },
+      },
+    });
+    if (existing) return { card: existing, alreadySaved: true };
+
+    const card = await db.card.create({
+      data: {
+        cardType: "sentence",
+        deckId: deck.id,
+        question: input.sentenceText,
+        answer: input.translation,
+        reading: input.reading,
+        examples: input.examples ?? [],
+        sourceUrl: input.sourceUrl,
+        sourceType: input.sourceUrl ? "web" : undefined,
+        contextSentence: input.contextSentence,
+        tags: ["sentence"],
         schedule: { create: {} },
       },
     });

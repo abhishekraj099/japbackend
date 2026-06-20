@@ -46,6 +46,23 @@ export const createGrammarCardSchema = z.object({
   contextSentence: z.string().max(1000).optional(),
 });
 
+/**
+ * Sentence flashcard creation. Like grammar cards, sentences map onto the
+ * shared Card table (cardType "sentence"): sentenceText -> question,
+ * translation -> answer, with reading/examples reusing the existing columns.
+ * deckId is optional and falls back to the user's first deck.
+ */
+export const createSentenceCardSchema = z.object({
+  deckId: z.string().cuid().optional(),
+  sentenceText: z.string().min(1).max(1000),
+  translation: z.string().min(1).max(1000),
+  reading: z.string().max(1000).optional(),
+  examples: z.array(z.string().max(500)).max(10).optional(),
+  sourceUrl: z.string().url().optional(),
+  contextSentence: z.string().max(1000).optional(),
+});
+
 export type CreateCardInput = z.infer<typeof createCardSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type CreateGrammarCardInput = z.infer<typeof createGrammarCardSchema>;
+export type CreateSentenceCardInput = z.infer<typeof createSentenceCardSchema>;

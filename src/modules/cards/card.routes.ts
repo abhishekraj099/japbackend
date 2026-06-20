@@ -7,6 +7,7 @@ import {
   createCardSchema,
   updateCardSchema,
   createGrammarCardSchema,
+  createSentenceCardSchema,
 } from "./card.schema.js";
 
 export const cardRoutes = Router();
@@ -17,6 +18,8 @@ cardRoutes.use(authenticate);
 // segment is not captured as a card id.
 cardRoutes.post("/grammar", validate(createGrammarCardSchema), cardController.createGrammar);
 cardRoutes.get("/grammar/saved", cardController.getSavedGrammar);
+// Sentence-card route — literal "/sentence" before "/:id".
+cardRoutes.post("/sentence", validate(createSentenceCardSchema), cardController.createSentence);
 // Saved vocab words — literal "/saved" before "/:id" so it isn't read as an id.
 cardRoutes.get("/saved", cardController.getSavedWords);
 
