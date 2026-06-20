@@ -9,6 +9,7 @@ const enrichmentFields = {
   sourceType: z.string().optional(),
   sourceUrl: z.string().url().optional(),
   contextSentence: z.string().max(1000).optional(),
+  examples: z.array(z.string().max(500)).max(10).optional(),
 };
 
 export const createCardSchema = z.object({
