@@ -7,6 +7,12 @@ import {
 } from "./card.schema.js";
 
 export class CardService {
+  /**
+   * Create a vocabulary flashcard. Idempotent per (user, question): if the
+   * same word is already saved in any of the user's decks, the existing card
+   * is returned with `alreadySaved: true` instead of inserting a duplicate —
+   * mirroring the grammar-card dedup.
+   */
   async create(userId: string, input: CreateCardInput) {
     const deck = await db.deck.findFirst({
       where: { id: input.deckId, userId },
@@ -16,8 +22,17 @@ export class CardService {
       throw new AppError(404, "Deck not found", "DECK_NOT_FOUND");
     }
 
+    const existing = await db.card.findFirst({
+      where: {
+        cardType: "vocab",
+        question: input.question,
+        deck: { userId },
+      },
+    });
+    if (existing) return { card: existing, alreadySaved: true };
+
     const { tags, ...rest } = input;
-    return await db.card.create({
+    const card = await db.card.create({
       data: {
         ...rest,
         tags: tags || [],
@@ -26,6 +41,18 @@ export class CardService {
         },
       },
     });
+    return { card, alreadySaved: false };
+  }
+
+  /** Questions (words) of all vocab cards the user has saved — powers the
+   *  extension's vocab "Saved ✓" state. */
+  async getSavedWords(userId: string): Promise<string[]> {
+    const rows = await db.card.findMany({
+      where: { cardType: "vocab", deck: { userId } },
+      select: { question: true },
+      distinct: ["question"],
+    });
+    return rows.map((r) => r.question).filter(Boolean);
   }
 
   async getByDeck(deckId: string, userId: string) {

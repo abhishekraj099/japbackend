@@ -43,8 +43,26 @@ export const create = async (
   next: NextFunction
 ) => {
   try {
-    const card = await cardService.create(req.user!.id, req.body);
-    res.status(201).json(card);
+    const { card, alreadySaved } = await cardService.create(
+      req.user!.id,
+      req.body
+    );
+    // Keep the card fields at the top level (existing clients read the card
+    // directly); add `alreadySaved` for dedup-aware callers.
+    res.status(alreadySaved ? 200 : 201).json({ ...card, alreadySaved });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSavedWords = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const words = await cardService.getSavedWords(req.user!.id);
+    res.json({ words });
   } catch (error) {
     next(error);
   }

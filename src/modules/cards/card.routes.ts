@@ -17,6 +17,8 @@ cardRoutes.use(authenticate);
 // segment is not captured as a card id.
 cardRoutes.post("/grammar", validate(createGrammarCardSchema), cardController.createGrammar);
 cardRoutes.get("/grammar/saved", cardController.getSavedGrammar);
+// Saved vocab words — literal "/saved" before "/:id" so it isn't read as an id.
+cardRoutes.get("/saved", cardController.getSavedWords);
 
 cardRoutes.post("/", validate(createCardSchema), cardController.create);
 cardRoutes.get("/deck/:deckId", cardController.getByDeck);
