@@ -1,8 +1,41 @@
 import { Request, Response, NextFunction } from "express";
 import { CardService } from "./card.service.js";
-import { CreateCardInput, UpdateCardInput } from "./card.schema.js";
+import {
+  CreateCardInput,
+  UpdateCardInput,
+  CreateGrammarCardInput,
+} from "./card.schema.js";
 
 const cardService = new CardService();
+
+export const createGrammar = async (
+  req: Request<{}, {}, CreateGrammarCardInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { card, alreadySaved } = await cardService.createGrammar(
+      req.user!.id,
+      req.body
+    );
+    res.status(alreadySaved ? 200 : 201).json({ card, alreadySaved });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSavedGrammar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const patternIds = await cardService.getSavedGrammarPatternIds(req.user!.id);
+    res.json({ patternIds });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const create = async (
   req: Request<{}, {}, CreateCardInput>,

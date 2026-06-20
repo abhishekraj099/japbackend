@@ -26,5 +26,25 @@ export const updateCardSchema = z.object({
   ...enrichmentFields,
 });
 
+/**
+ * Grammar flashcard creation. Distinct payload from vocabulary cards — the
+ * client sends the detected grammar pattern; the service maps it onto the
+ * shared Card table with cardType "grammar". deckId is optional: when omitted
+ * the service falls back to the user's first deck (mirrors the extension's
+ * vocabulary save flow).
+ */
+export const createGrammarCardSchema = z.object({
+  deckId: z.string().cuid().optional(),
+  patternId: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
+  jlptLevel: z.enum(["N5", "N4", "N3", "N2", "N1"]).optional(),
+  explanation: z.string().min(1).max(1000),
+  detail: z.string().max(2000).optional(),
+  examples: z.array(z.string().max(500)).max(10).optional(),
+  sourceUrl: z.string().url().optional(),
+  contextSentence: z.string().max(1000).optional(),
+});
+
 export type CreateCardInput = z.infer<typeof createCardSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
+export type CreateGrammarCardInput = z.infer<typeof createGrammarCardSchema>;

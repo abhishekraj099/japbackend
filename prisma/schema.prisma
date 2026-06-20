@@ -41,6 +41,11 @@ model Deck {
 model Card {
   id              String        @id @default(cuid())
 
+  // Discriminator for single-table inheritance: "vocab" | "grammar".
+  // Keeps grammar + vocabulary cards in one table so a future unified review
+  // is a single query over cards/card_schedules with FSRS scheduling intact.
+  cardType        String        @default("vocab")
+
   question        String
   answer          String
   tags            String[]      @default([])
@@ -50,6 +55,10 @@ model Card {
   grammarNotes    String?
   jlptLevel       String?
   frequency       Int?
+
+  // Grammar-card fields (null/empty for vocabulary cards).
+  patternId       String?       // grammar pattern id, e.g. "te-iru" — dedup key
+  examples        String[]      @default([])
 
   sourceType      String?
   sourceUrl       String?
@@ -65,6 +74,8 @@ model Card {
   updatedAt       DateTime      @updatedAt
 
   @@index([deckId])
+  @@index([cardType])
+  @@index([deckId, cardType, patternId])
   @@map("cards")
 }
 
