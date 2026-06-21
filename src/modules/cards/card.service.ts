@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../../config/database.js";
 import { AppError } from "../../lib/errors/AppError.js";
 import {
@@ -6,6 +7,11 @@ import {
   CreateGrammarCardInput,
   CreateSentenceCardInput,
 } from "./card.schema.js";
+
+/** True for a Postgres unique-constraint violation (Prisma P2002). */
+function isUniqueViolation(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+}
 
 export class CardService {
   /**
@@ -23,26 +29,23 @@ export class CardService {
       throw new AppError(404, "Deck not found", "DECK_NOT_FOUND");
     }
 
-    const existing = await db.card.findFirst({
-      where: {
-        cardType: "vocab",
-        question: input.question,
-        deck: { userId },
-      },
-    });
-    if (existing) return { card: existing, alreadySaved: true };
-
     const { tags, ...rest } = input;
-    const card = await db.card.create({
-      data: {
-        ...rest,
-        tags: tags || [],
-        schedule: {
-          create: {},
-        },
-      },
-    });
-    return { card, alreadySaved: false };
+    try {
+      const card = await db.card.create({
+        data: { ...rest, tags: tags || [], schedule: { create: {} } },
+      });
+      return { card, alreadySaved: false };
+    } catch (e) {
+      // DB dedup (Phase 21A): unique(deckId, cardType, question) — return the
+      // existing card instead of inserting a duplicate.
+      if (isUniqueViolation(e)) {
+        const existing = await db.card.findFirst({
+          where: { deckId: input.deckId, cardType: "vocab", question: input.question },
+        });
+        if (existing) return { card: existing, alreadySaved: true };
+      }
+      throw e;
+    }
   }
 
   /** Questions (words) of all vocab cards the user has saved — powers the
@@ -116,33 +119,35 @@ export class CardService {
   async createGrammar(userId: string, input: CreateGrammarCardInput) {
     const deck = await this.resolveDeck(userId, input.deckId);
 
-    const existing = await db.card.findFirst({
-      where: {
-        cardType: "grammar",
-        patternId: input.patternId,
-        deck: { userId },
-      },
-    });
-    if (existing) return { card: existing, alreadySaved: true };
-
-    const card = await db.card.create({
-      data: {
-        cardType: "grammar",
-        deckId: deck.id,
-        question: input.name,
-        answer: input.explanation,
-        grammarNotes: input.detail,
-        jlptLevel: input.jlptLevel,
-        patternId: input.patternId,
-        examples: input.examples ?? [],
-        sourceUrl: input.sourceUrl,
-        sourceType: input.sourceUrl ? "web" : undefined,
-        contextSentence: input.contextSentence,
-        tags: ["grammar"],
-        schedule: { create: {} },
-      },
-    });
-    return { card, alreadySaved: false };
+    try {
+      const card = await db.card.create({
+        data: {
+          cardType: "grammar",
+          deckId: deck.id,
+          question: input.name,
+          answer: input.explanation,
+          grammarNotes: input.detail,
+          jlptLevel: input.jlptLevel,
+          patternId: input.patternId,
+          examples: input.examples ?? [],
+          sourceUrl: input.sourceUrl,
+          sourceType: input.sourceUrl ? "web" : undefined,
+          contextSentence: input.contextSentence,
+          tags: ["grammar"],
+          schedule: { create: {} },
+        },
+      });
+      return { card, alreadySaved: false };
+    } catch (e) {
+      // DB dedup (Phase 21A): unique(deckId, cardType, patternId).
+      if (isUniqueViolation(e)) {
+        const existing = await db.card.findFirst({
+          where: { deckId: deck.id, cardType: "grammar", patternId: input.patternId },
+        });
+        if (existing) return { card: existing, alreadySaved: true };
+      }
+      throw e;
+    }
   }
 
   /**
@@ -155,31 +160,33 @@ export class CardService {
   async createSentence(userId: string, input: CreateSentenceCardInput) {
     const deck = await this.resolveDeck(userId, input.deckId);
 
-    const existing = await db.card.findFirst({
-      where: {
-        cardType: "sentence",
-        question: input.sentenceText,
-        deck: { userId },
-      },
-    });
-    if (existing) return { card: existing, alreadySaved: true };
-
-    const card = await db.card.create({
-      data: {
-        cardType: "sentence",
-        deckId: deck.id,
-        question: input.sentenceText,
-        answer: input.translation,
-        reading: input.reading,
-        examples: input.examples ?? [],
-        sourceUrl: input.sourceUrl,
-        sourceType: input.sourceUrl ? "web" : undefined,
-        contextSentence: input.contextSentence,
-        tags: ["sentence"],
-        schedule: { create: {} },
-      },
-    });
-    return { card, alreadySaved: false };
+    try {
+      const card = await db.card.create({
+        data: {
+          cardType: "sentence",
+          deckId: deck.id,
+          question: input.sentenceText,
+          answer: input.translation,
+          reading: input.reading,
+          examples: input.examples ?? [],
+          sourceUrl: input.sourceUrl,
+          sourceType: input.sourceUrl ? "web" : undefined,
+          contextSentence: input.contextSentence,
+          tags: ["sentence"],
+          schedule: { create: {} },
+        },
+      });
+      return { card, alreadySaved: false };
+    } catch (e) {
+      // DB dedup (Phase 21A): unique(deckId, cardType, question=sentenceText).
+      if (isUniqueViolation(e)) {
+        const existing = await db.card.findFirst({
+          where: { deckId: deck.id, cardType: "sentence", question: input.sentenceText },
+        });
+        if (existing) return { card: existing, alreadySaved: true };
+      }
+      throw e;
+    }
   }
 
   /** patternIds of all grammar cards the user has saved — powers the

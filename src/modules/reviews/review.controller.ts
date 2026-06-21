@@ -1,13 +1,41 @@
 import { Request, Response, NextFunction } from "express";
 import { ReviewService } from "./review.service.js";
-import { SubmitReviewInput } from "./review.schema.js";
+import { SubmitReviewInput, BatchReviewInput } from "./review.schema.js";
 
 const reviewService = new ReviewService();
 
-export const getReviews = async (req: Request, res: Response, next: NextFunction) => {
+export const getReviews = async (
+  req: Request<{}, {}, {}, { page?: string; limit?: string }>,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const reviews = await reviewService.getReviewsForUser(req.user!.id);
-    res.json(reviews);
+    const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const result = await reviewService.getReviewsForUser(req.user!.id, page, limit);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const submitBatch = async (
+  req: Request<{}, {}, BatchReviewInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const result = await reviewService.submitBatch(req.user!.id, req.body);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await reviewService.getStats(req.user!.id);
+    res.json(stats);
   } catch (error) {
     next(error);
   }

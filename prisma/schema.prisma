@@ -109,7 +109,13 @@ model Card {
 
   @@index([deckId])
   @@index([cardType])
-  @@index([deckId, cardType, patternId])
+  // Database-level dedup (Phase 21A). Replaces app-level check-then-insert.
+  // Vocabulary/sentence: one (deck, type, question). Grammar: one (deck, type,
+  // patternId) — patternId is NULL for non-grammar so those rows never collide
+  // here (NULLs are distinct in Postgres).
+  @@unique([deckId, cardType, question])
+  @@unique([deckId, cardType, patternId])
+  @@index([updatedAt])
   @@map("cards")
 }
 
@@ -144,6 +150,10 @@ model ReviewLog {
 
   rating     Int
   duration   Int
+
+  // Client-supplied idempotency key (Phase 21B). Unique so a retried/offline
+  // batch never double-applies a review. Null for legacy single submits.
+  clientReviewId String? @unique
 
   reviewedAt DateTime @default(now())
   createdAt  DateTime @default(now())

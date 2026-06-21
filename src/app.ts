@@ -11,6 +11,7 @@ import { cardRoutes } from "./modules/cards/card.routes.js";
 import { reviewRoutes } from "./modules/reviews/review.routes.js";
 import { dictionaryRoutes } from "./modules/dictionary/dictionary.routes.js";
 import { integrationRoutes } from "./modules/integrations/integration.routes.js";
+import { syncRoutes } from "./modules/sync/sync.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -31,6 +32,7 @@ export const createApp = () => {
   app.use("/api/reviews", reviewRoutes);
   app.use("/api/dictionary", dictionaryRoutes);
   app.use("/api/integrations", integrationRoutes);
+  app.use("/api/sync", syncRoutes);
 
   app.use((req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });
