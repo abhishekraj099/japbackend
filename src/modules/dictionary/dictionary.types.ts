@@ -7,6 +7,7 @@ export interface DictionaryResult {
   partOfSpeech: string | null;
   frequency: number | null;
   commonWord: boolean;
+  pitchAccent: string | null;
 }
 
 /**
@@ -20,4 +21,5 @@ export interface NormalizedEntry {
   jlptLevel?: string;
   partOfSpeech?: string;
   frequency?: number;
+  pitchAccent?: string;
 }

@@ -21,6 +21,7 @@ const SELECT = {
   partOfSpeech: true,
   frequency: true,
   commonWord: true,
+  pitchAccent: true,
 } satisfies Prisma.DictionaryEntrySelect;
 
 export class DictionaryService {

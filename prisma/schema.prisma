@@ -56,6 +56,10 @@ model Card {
   jlptLevel       String?
   frequency       Int?
 
+  // Optional pitch-accent metadata for vocabulary cards, e.g. "①" / "②".
+  // Null for grammar/sentence cards and when no data is available.
+  pitchAccent     String?
+
   // Grammar-card fields (null/empty for vocabulary cards).
   patternId       String?       // grammar pattern id, e.g. "te-iru" — dedup key
   examples        String[]      @default([])
@@ -129,6 +133,7 @@ model DictionaryEntry {
   jlptLevel    String?
   frequency    Int?
   partOfSpeech String?
+  pitchAccent  String?
   priority     Int?
   commonWord   Boolean  @default(false)
   source       String   @default("jmdict")

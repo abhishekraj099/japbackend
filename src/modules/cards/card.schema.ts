@@ -6,6 +6,7 @@ const enrichmentFields = {
   grammarNotes: z.string().max(2000).optional(),
   jlptLevel: z.enum(["N5", "N4", "N3", "N2", "N1"]).optional(),
   frequency: z.number().int().nonnegative().optional(),
+  pitchAccent: z.string().max(50).optional(),
   sourceType: z.string().optional(),
   sourceUrl: z.string().url().optional(),
   contextSentence: z.string().max(1000).optional(),
