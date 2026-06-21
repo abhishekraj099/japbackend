@@ -90,6 +90,14 @@ model Card {
   sourceUrl       String?
   contextSentence String?
 
+  // Combined-card fields (Phase 18C): an example sentence attached to a
+  // vocabulary card. A render mode, NOT a new cardType — null for plain cards.
+  exampleSentence    String?
+  exampleReading     String?
+  exampleTranslation String?
+  pageTitle          String?
+  extractionSource   String?  // "ruby" | "page" | "ai"
+
   deckId          String
   deck            Deck          @relation(fields: [deckId], references: [id], onDelete: Cascade)
 

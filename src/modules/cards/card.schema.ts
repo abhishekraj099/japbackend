@@ -11,6 +11,12 @@ const enrichmentFields = {
   sourceUrl: z.string().url().optional(),
   contextSentence: z.string().max(1000).optional(),
   examples: z.array(z.string().max(500)).max(10).optional(),
+  // Combined-card example fields (Phase 18C).
+  exampleSentence: z.string().max(1000).optional(),
+  exampleReading: z.string().max(1000).optional(),
+  exampleTranslation: z.string().max(1000).optional(),
+  pageTitle: z.string().max(500).optional(),
+  extractionSource: z.enum(["ruby", "page", "ai"]).optional(),
 };
 
 export const createCardSchema = z.object({
