@@ -13,11 +13,33 @@ model User {
   passwordHash String
 
   decks        Deck[]
+  integrations Integration[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@map("users")
+}
+
+// External integration connections (e.g. Anki, future cloud storage). Provider
+// is a free-form string and there are NO provider-specific columns, so new
+// providers (google_drive, dropbox, …) need no schema change. One row per
+// (user, provider). This phase only tracks connection status — no sync.
+model Integration {
+  id        String   @id @default(cuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider  String   // "anki" | "google_drive" | "dropbox" | …
+  status    String   @default("connected") // "connected" | "disconnected"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("integrations")
 }
 
 model Deck {
