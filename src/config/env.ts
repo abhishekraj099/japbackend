@@ -9,6 +9,10 @@ const envSchema = z.object({
   JWT_EXPIRE: z.string().default("7d"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  // AI fallback lookup (Phase 18A). Optional — when unset the AI endpoint
+  // responds 503 and the extension simply shows "no result".
+  ANTHROPIC_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default("claude-haiku-4-5-20251001"),
 });
 
 export const env = envSchema.parse(process.env);

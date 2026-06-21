@@ -8,6 +8,8 @@ export interface DictionaryResult {
   frequency: number | null;
   commonWord: boolean;
   pitchAccent: string | null;
+  /** Provenance — omitted for JMdict rows, "ai" for AI-fallback results. */
+  source?: "jmdict" | "ai";
 }
 
 /**
