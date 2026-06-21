@@ -59,6 +59,27 @@ export class CardService {
     return rows.map((r) => r.question).filter(Boolean);
   }
 
+  /**
+   * Saved vocab split by maturity for page word-status coloring (Phase 23).
+   * "known" = mature (FSRS stability ≥ 21 days, the Anki mature convention),
+   * "learning" = saved but not yet mature. Read-only; no FSRS/review change.
+   */
+  async getWordStatus(userId: string): Promise<{ known: string[]; learning: string[] }> {
+    const rows = await db.card.findMany({
+      where: { cardType: "vocab", deck: { userId } },
+      select: { question: true, schedule: { select: { stability: true } } },
+    });
+    const known = new Set<string>();
+    const learning = new Set<string>();
+    for (const r of rows) {
+      if (!r.question) continue;
+      ((r.schedule?.stability ?? 0) >= 21 ? known : learning).add(r.question);
+    }
+    // A word counts as known if any of its cards is mature.
+    for (const w of known) learning.delete(w);
+    return { known: [...known], learning: [...learning] };
+  }
+
   async getByDeck(deckId: string, userId: string) {
     const deck = await db.deck.findFirst({
       where: { id: deckId, userId },

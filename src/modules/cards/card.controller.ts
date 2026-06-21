@@ -85,6 +85,19 @@ export const getSavedWords = async (
   }
 };
 
+export const getWordStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const status = await cardService.getWordStatus(req.user!.id);
+    res.json(status);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getByDeck = async (
   req: Request<{ deckId: string }>,
   res: Response,

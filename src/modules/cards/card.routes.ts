@@ -22,6 +22,8 @@ cardRoutes.get("/grammar/saved", cardController.getSavedGrammar);
 cardRoutes.post("/sentence", validate(createSentenceCardSchema), cardController.createSentence);
 // Saved vocab words — literal "/saved" before "/:id" so it isn't read as an id.
 cardRoutes.get("/saved", cardController.getSavedWords);
+// Word-status (known/learning by maturity) for page coloring (Phase 23).
+cardRoutes.get("/word-status", cardController.getWordStatus);
 
 cardRoutes.post("/", validate(createCardSchema), cardController.create);
 cardRoutes.get("/deck/:deckId", cardController.getByDeck);
