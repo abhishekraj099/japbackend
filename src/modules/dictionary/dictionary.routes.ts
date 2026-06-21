@@ -7,3 +7,5 @@ export const dictionaryRoutes = Router();
 dictionaryRoutes.get("/search", dictionaryController.search);
 // AI fallback lookup (Phase 18A) — used when /search has no result.
 dictionaryRoutes.get("/ai", dictionaryController.aiSearch);
+// AI sentence reading + translation (Phase 18D fallback).
+dictionaryRoutes.get("/ai-sentence", dictionaryController.aiSentenceSearch);

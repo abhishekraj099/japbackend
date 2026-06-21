@@ -52,6 +52,76 @@ function parseAi(text: string): AiFields | null {
   }
 }
 
+// ── Sentence reading + translation (Phase 18D AI fallback) ───────────────────
+
+export interface AiSentence {
+  reading: string | null;
+  translation: string | null;
+}
+
+const sentenceCache = new Map<string, AiSentence | null>();
+
+const SENTENCE_SYSTEM_PROMPT =
+  "You are a precise Japanese-English assistant. Given a Japanese sentence, " +
+  "respond with ONLY a compact JSON object and nothing else, shaped exactly as: " +
+  '{"reading": string (full hiragana reading of the sentence), "translation": string (natural English translation)}.';
+
+/** Low-level single-message Anthropic call returning the raw text, or null. */
+async function callClaude(system: string, user: string, maxTokens: number): Promise<string | null> {
+  if (!env.ANTHROPIC_API_KEY) return null;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: env.AI_MODEL,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+    });
+    if (!res.ok) {
+      logger.warn("AI call HTTP error", { status: res.status });
+      return null;
+    }
+    const data = (await res.json()) as { content?: Array<{ text?: string }> };
+    return data.content?.map((c) => c.text ?? "").join("") ?? "";
+  } catch (err) {
+    logger.warn("AI call failed", { error: (err as Error).message });
+    return null;
+  }
+}
+
+export async function aiSentence(query: string): Promise<AiSentence | null> {
+  const q = query.trim();
+  if (!q || !env.ANTHROPIC_API_KEY) return null;
+  if (sentenceCache.has(q)) return sentenceCache.get(q)!;
+
+  const text = await callClaude(SENTENCE_SYSTEM_PROMPT, q, 1024);
+  let result: AiSentence | null = null;
+  if (text) {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        const o = JSON.parse(m[0]) as Partial<AiSentence>;
+        result = {
+          reading: o.reading?.trim() || null,
+          translation: o.translation?.trim() || null,
+        };
+      } catch { /* leave null */ }
+    }
+  }
+  if (result) {
+    if (sentenceCache.size >= MAX_CACHE) sentenceCache.clear();
+    sentenceCache.set(q, result);
+  }
+  return result;
+}
+
 export async function aiLookup(query: string): Promise<DictionaryResult | null> {
   const q = query.trim();
   if (!q) return null;
