@@ -17,6 +17,8 @@ const enrichmentFields = {
   exampleTranslation: z.string().max(1000).optional(),
   pageTitle: z.string().max(500).optional(),
   extractionSource: z.enum(["ruby", "page", "ai"]).optional(),
+  // Contextual screenshot as a JPEG data URL (Phase 24). Capped ~700KB.
+  imageUrl: z.string().max(700000).optional(),
 };
 
 export const createCardSchema = z.object({
@@ -67,6 +69,7 @@ export const createSentenceCardSchema = z.object({
   examples: z.array(z.string().max(500)).max(10).optional(),
   sourceUrl: z.string().url().optional(),
   contextSentence: z.string().max(1000).optional(),
+  imageUrl: z.string().max(700000).optional(),
 });
 
 export type CreateCardInput = z.infer<typeof createCardSchema>;

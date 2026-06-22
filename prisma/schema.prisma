@@ -98,6 +98,10 @@ model Card {
   pageTitle          String?
   extractionSource   String?  // "ruby" | "page" | "ai"
 
+  // Contextual screenshot for the card (Phase 24): a data URL (JPEG) captured
+  // from a video frame or page region at mine time. Optional.
+  imageUrl           String?  @db.Text
+
   deckId          String
   deck            Deck          @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
