@@ -15,7 +15,7 @@ const envSchema = z.object({
   AI_MODEL: z.string().default("claude-haiku-4-5-20251001"),
   // AI provider layer (Phase 26A). Gemini is the only live provider today.
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
 });
 
 export const env = envSchema.parse(process.env);
