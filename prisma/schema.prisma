@@ -193,3 +193,50 @@ model DictionaryEntry {
   @@index([commonWord, frequency])
   @@map("dictionary_entries")
 }
+
+// AI lookup cache (Phase 26A). Persistent (no TTL). Keyed by normalizedQuery +
+// kind ("word"|"sentence") so repeated/inflected lookups avoid AI calls. `kind`
+// is an addition beyond the spec's field list to disambiguate word vs sentence
+// entries that could share a normalized form.
+model AiDictionaryEntry {
+  id              String   @id @default(cuid())
+
+  query           String
+  normalizedQuery String
+  kind            String   @default("word") // "word" | "sentence"
+
+  reading         String?
+  meaning         String?
+  examples        String[] @default([])
+  jlptLevel       String?
+  pitchAccent     String?
+
+  provider        String
+  hitCount        Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastUsedAt      DateTime @default(now())
+
+  @@unique([normalizedQuery, kind])
+  @@index([provider])
+  @@index([hitCount])
+  @@map("ai_dictionary_entries")
+}
+
+// AI usage counter (Phase 26A premium prep). One row per (userId, date);
+// userId is "anonymous" for unauthenticated lookups. Records cache MISSES
+// (provider calls) only — cache hits never increment. No enforcement yet.
+model AiUsage {
+  id           String   @id @default(cuid())
+
+  userId       String   // "anonymous" when unauthenticated
+  date         String   // YYYY-MM-DD (UTC)
+  requestCount Int      @default(0)
+
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("ai_usage")
+}

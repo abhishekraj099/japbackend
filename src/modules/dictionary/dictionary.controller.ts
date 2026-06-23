@@ -32,7 +32,7 @@ export const aiSearch = async (
       return res.status(503).json({ error: "AI lookup not configured" });
     }
     const q = req.query.q ?? "";
-    const result = await aiLookup(q);
+    const result = await aiLookup(q, req.user?.id ?? "anonymous");
     if (!result) return res.status(404).json({ error: "No result" });
     res.json(result);
   } catch (error) {
@@ -53,7 +53,7 @@ export const aiSentenceSearch = async (
     if (!aiLookupAvailable()) {
       return res.status(503).json({ error: "AI lookup not configured" });
     }
-    const result = await aiSentence(req.query.q ?? "");
+    const result = await aiSentence(req.query.q ?? "", req.user?.id ?? "anonymous");
     if (!result) return res.status(404).json({ error: "No result" });
     res.json(result);
   } catch (error) {
