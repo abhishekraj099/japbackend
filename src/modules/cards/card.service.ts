@@ -194,6 +194,7 @@ export class CardService {
           sourceType: input.sourceUrl ? "web" : undefined,
           contextSentence: input.contextSentence,
           imageUrl: input.imageUrl,
+          audioUrl: input.audioUrl,
           tags: ["sentence"],
           schedule: { create: {} },
         },

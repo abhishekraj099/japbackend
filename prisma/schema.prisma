@@ -102,6 +102,10 @@ model Card {
   // from a video frame or page region at mine time. Optional.
   imageUrl           String?  @db.Text
 
+  // Native audio clip mined from the video (Phase 25D): a data URL (webm/opus)
+  // of the spoken subtitle line. Optional.
+  audioUrl           String?  @db.Text
+
   deckId          String
   deck            Deck          @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
