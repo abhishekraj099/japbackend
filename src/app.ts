@@ -22,6 +22,7 @@ import { achievementRoutes } from "./modules/achievements/achievement.routes.js"
 import { roadmapRoutes } from "./modules/roadmap/roadmap.routes.js";
 import { grammarRoutes } from "./modules/grammar/grammar.routes.js";
 import { jlptRoutes } from "./modules/jlpt/jlpt.routes.js";
+import { plannerRoutes } from "./modules/planner/planner.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -64,6 +65,7 @@ export const createApp = () => {
     r.use("/roadmap", roadmapRoutes);
     r.use("/grammar", grammarRoutes);
     r.use("/jlpt", jlptRoutes);
+    r.use("/planner", plannerRoutes);
     return r;
   };
 
