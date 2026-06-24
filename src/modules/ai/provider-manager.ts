@@ -1,5 +1,11 @@
 import logger from "../../config/logger.js";
-import type { AIProvider, AIWordResult, AISentenceResult } from "./ai.types.js";
+import type {
+  AIProvider,
+  AIWordResult,
+  AISentenceResult,
+  GrammarAssistantInput,
+  GrammarAssistantResult,
+} from "./ai.types.js";
 import { GeminiProvider } from "./providers/gemini.provider.js";
 
 /**
@@ -42,6 +48,21 @@ class AIProviderManager {
         if (result && result.translation) return { result, provider: p.name };
       } catch (err) {
         logger.warn("AI provider sentence lookup threw", { provider: p.name, error: (err as Error).message });
+      }
+    }
+    return null;
+  }
+
+  async lookupGrammar(
+    input: GrammarAssistantInput
+  ): Promise<{ result: GrammarAssistantResult; provider: string } | null> {
+    for (const p of this.providers) {
+      if (!p.isAvailable() || !p.lookupGrammar) continue;
+      try {
+        const result = await p.lookupGrammar(input);
+        if (result && result.explanation) return { result, provider: p.name };
+      } catch (err) {
+        logger.warn("AI provider grammar lookup threw", { provider: p.name, error: (err as Error).message });
       }
     }
     return null;

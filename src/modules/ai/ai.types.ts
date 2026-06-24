@@ -20,6 +20,22 @@ export interface AISentenceResult {
   translation: string | null; // required for a valid result
 }
 
+// ── AI Grammar Assistant (Phase 36) ──────────────────────────────────────────
+export type GrammarQuestionType = "explain" | "compare" | "breakdown";
+
+export interface GrammarAssistantInput {
+  questionType: GrammarQuestionType;
+  pattern?: string | null; // detected grammar pattern (optional context)
+  text: string; // pattern name, "A vs B", or a full sentence
+}
+
+export interface GrammarAssistantResult {
+  title: string;
+  explanation: string; // required for a valid result
+  examples: string[];
+  confidence: "high" | "medium" | "low";
+}
+
 export interface AIProvider {
   /** Stable identifier stored on cache entries (e.g. "gemini"). */
   readonly name: string;
@@ -29,4 +45,6 @@ export interface AIProvider {
   lookupWord(query: string): Promise<AIWordResult | null>;
   /** Look up a sentence's reading + translation. Returns null on failure. */
   lookupSentence(query: string): Promise<AISentenceResult | null>;
+  /** Contextual grammar help (Phase 36). Optional per provider. */
+  lookupGrammar?(input: GrammarAssistantInput): Promise<GrammarAssistantResult | null>;
 }

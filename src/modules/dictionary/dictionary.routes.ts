@@ -10,3 +10,5 @@ dictionaryRoutes.get("/search", dictionaryController.search);
 // AI endpoints (Phase 26B): authenticated + rate-limited + quota-enforced.
 dictionaryRoutes.get("/ai", aiLimiter, authenticate, dictionaryController.aiSearch);
 dictionaryRoutes.get("/ai-sentence", aiLimiter, authenticate, dictionaryController.aiSentenceSearch);
+// AI Grammar Assistant (Phase 36) — POST { questionType, pattern?, text }.
+dictionaryRoutes.post("/grammar", aiLimiter, authenticate, dictionaryController.grammarAssistant);

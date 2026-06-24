@@ -3,7 +3,12 @@ import { env } from "../../config/env.js";
 import { aiProviderManager } from "./provider-manager.js";
 import { aiCacheService } from "./ai-cache.service.js";
 import { normalizeQuery } from "./normalize.js";
-import type { AIWordResult, AISentenceResult } from "./ai.types.js";
+import type {
+  AIWordResult,
+  AISentenceResult,
+  GrammarAssistantInput,
+  GrammarAssistantResult,
+} from "./ai.types.js";
 
 /**
  * AI orchestration (Phase 26A + 26B). Flow:
@@ -25,6 +30,13 @@ export interface AiWordOutcome {
 }
 export interface AiSentenceOutcome {
   result: AISentenceResult | null;
+  source: AiSource;
+  provider: string | null;
+  remainingQuota: number;
+  quotaExceeded: boolean;
+}
+export interface AiGrammarOutcome {
+  result: GrammarAssistantResult | null;
   source: AiSource;
   provider: string | null;
   remainingQuota: number;
@@ -99,6 +111,36 @@ class AiService {
       return { result: null, source: "ai", provider: null, remainingQuota: remaining(used + 1), quotaExceeded: false };
     }
     await aiCacheService.saveSentence(query, normalized, hit.result, hit.provider);
+    return { result: hit.result, source: "ai", provider: hit.provider, remainingQuota: remaining(used + 1), quotaExceeded: false };
+  }
+
+  /** Contextual grammar help (Phase 36). Same cache→quota→provider flow; the
+   *  cache key folds questionType + pattern + text so each distinct question is
+   *  cached once and repeated asks never hit the model again. */
+  async grammarAssistant(input: GrammarAssistantInput, userId: string): Promise<AiGrammarOutcome> {
+    const keySource = `${input.questionType}::${input.pattern ?? "-"}::${input.text}`;
+    const normalized = normalizeQuery(keySource);
+    const { limit, used } = await this.quota(userId);
+    const remaining = (u: number) => Math.max(0, limit - u);
+
+    if (normalized) {
+      const cached = await aiCacheService.getGrammar(normalized);
+      if (cached) {
+        return { result: cached.result, source: "ai-cache", provider: cached.provider, remainingQuota: remaining(used), quotaExceeded: false };
+      }
+    }
+    if (!normalized || !input.text.trim() || !aiProviderManager.isAvailable()) {
+      return { result: null, source: "ai", provider: null, remainingQuota: remaining(used), quotaExceeded: false };
+    }
+    if (used >= limit) {
+      return { result: null, source: "ai", provider: null, remainingQuota: 0, quotaExceeded: true };
+    }
+    await aiCacheService.recordUsage(userId);
+    const hit = await aiProviderManager.lookupGrammar(input);
+    if (!hit || !hit.result.explanation) {
+      return { result: null, source: "ai", provider: null, remainingQuota: remaining(used + 1), quotaExceeded: false };
+    }
+    await aiCacheService.saveGrammar(keySource, normalized, hit.result, hit.provider);
     return { result: hit.result, source: "ai", provider: hit.provider, remainingQuota: remaining(used + 1), quotaExceeded: false };
   }
 }

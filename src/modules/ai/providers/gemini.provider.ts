@@ -1,6 +1,12 @@
 import { env } from "../../../config/env.js";
 import logger from "../../../config/logger.js";
-import type { AIProvider, AIWordResult, AISentenceResult } from "../ai.types.js";
+import type {
+  AIProvider,
+  AIWordResult,
+  AISentenceResult,
+  GrammarAssistantInput,
+  GrammarAssistantResult,
+} from "../ai.types.js";
 
 /**
  * Gemini provider (Phase 26A) — the only live AI provider today.
@@ -22,6 +28,24 @@ const SENTENCE_PROMPT =
   "You are a precise Japanese-English assistant. Given a Japanese sentence, " +
   "respond with ONLY a compact JSON object and nothing else, shaped exactly as: " +
   '{"reading": string (full hiragana reading of the sentence), "translation": string (natural English translation)}.';
+
+// Grammar Assistant (Phase 36) — structured JSON only, no markdown.
+const GRAMMAR_SHAPE =
+  'Respond with ONLY a compact JSON object and nothing else, shaped exactly as: ' +
+  '{"title": string, "explanation": string, "examples": string[] (2-3 items, each "日本語 — English"), ' +
+  '"confidence": "high"|"medium"|"low"}.';
+const GRAMMAR_PROMPTS: Record<GrammarAssistantInput["questionType"], string> = {
+  explain:
+    "You are a precise Japanese grammar teacher. Explain the given Japanese grammar pattern: its meaning, " +
+    "when it is used, and the nuance it adds (2-4 sentences). " + GRAMMAR_SHAPE,
+  compare:
+    "You are a precise Japanese grammar teacher. Compare the given Japanese grammar patterns, focusing on the " +
+    "differences in nuance, register, and usage. " + GRAMMAR_SHAPE,
+  breakdown:
+    "You are a precise Japanese grammar teacher. Break down the given Japanese sentence: the role of each part, " +
+    "the grammar points involved, a natural English translation, and any nuance — as clear prose in `explanation`. " +
+    GRAMMAR_SHAPE,
+};
 
 function extractJson<T>(text: string): Partial<T> | null {
   const m = text.match(/\{[\s\S]*\}/);
@@ -103,6 +127,21 @@ export class GeminiProvider implements AIProvider {
     return {
       reading: o.reading?.trim() || null,
       translation: o.translation?.trim() || null,
+    };
+  }
+
+  async lookupGrammar(input: GrammarAssistantInput): Promise<GrammarAssistantResult | null> {
+    const user = input.pattern ? `Pattern: ${input.pattern}\n${input.text.trim()}` : input.text.trim();
+    const text = await this.call(GRAMMAR_PROMPTS[input.questionType], user, 1024);
+    if (!text) return null;
+    const o = extractJson<{ title: string; explanation: string; examples: string[]; confidence: string }>(text);
+    if (!o || !o.explanation?.trim()) return null;
+    const confidence = o.confidence === "high" || o.confidence === "low" ? o.confidence : "medium";
+    return {
+      title: o.title?.trim() || input.text.trim(),
+      explanation: o.explanation.trim(),
+      examples: Array.isArray(o.examples) ? o.examples.filter((e) => typeof e === "string").slice(0, 3) : [],
+      confidence,
     };
   }
 }

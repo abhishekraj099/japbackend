@@ -1,7 +1,7 @@
 import { db } from "../../config/database.js";
-import type { AIWordResult, AISentenceResult } from "./ai.types.js";
+import type { AIWordResult, AISentenceResult, GrammarAssistantResult } from "./ai.types.js";
 
-type Kind = "word" | "sentence";
+type Kind = "word" | "sentence" | "grammar";
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -59,6 +59,40 @@ export class AiCacheService {
       reading: r.reading,
       meaning: r.translation, // translation stored in `meaning`
       examples: [],
+      jlptLevel: null,
+      pitchAccent: null,
+      provider,
+    });
+  }
+
+  // ── Grammar Assistant cache (Phase 36) ──────────────────────────────────────
+  // The structured result is serialized to the `meaning` Text column; examples
+  // mirror to the `examples` column. Keyed by (normalizedQuery, "grammar") where
+  // normalizedQuery already folds questionType + pattern + sentence.
+  async getGrammar(normalizedQuery: string): Promise<{ result: GrammarAssistantResult; provider: string } | null> {
+    const row = await db.aiDictionaryEntry.findUnique({
+      where: { normalizedQuery_kind: { normalizedQuery, kind: "grammar" } },
+    });
+    if (!row || !row.meaning) return null;
+    try {
+      const result = JSON.parse(row.meaning) as GrammarAssistantResult;
+      await this.touch(row.id);
+      return { result, provider: row.provider };
+    } catch {
+      return null;
+    }
+  }
+
+  async saveGrammar(
+    query: string,
+    normalizedQuery: string,
+    r: GrammarAssistantResult,
+    provider: string
+  ): Promise<void> {
+    await this.save(query, normalizedQuery, "grammar", {
+      reading: r.title,
+      meaning: JSON.stringify(r),
+      examples: r.examples ?? [],
       jlptLevel: null,
       pitchAccent: null,
       provider,
