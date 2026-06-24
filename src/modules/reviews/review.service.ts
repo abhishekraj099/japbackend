@@ -27,6 +27,83 @@ export class ReviewService {
     return { reviews, total, page: safePage, limit: take, hasMore: skip + reviews.length < total };
   }
 
+  /**
+   * Focus Review Sessions (Phase 40). Read-only: selects + orders existing
+   * cards (with their schedule) by a weakness signal for a focus type. Reuses
+   * the same shape as getDueCards so the review UI/flow is identical. NO
+   * schedule mutation, no FSRS change — scoring is for ordering only.
+   */
+  async getFocusCards(
+    userId: string,
+    opts: { type: string; jlpt?: string; band?: string; limit?: number }
+  ) {
+    const take = Math.min(Math.max(opts.limit ?? 20, 1), DUE_LIMIT_MAX);
+
+    // Per-card review stats (one aggregated query, bounded by reviewed cards).
+    const agg = await db.$queryRaw<Array<{ cardId: string; total: bigint; fails: bigint; passes: bigint }>>`
+      SELECT rl."cardId" AS "cardId",
+             COUNT(*) AS "total",
+             COUNT(*) FILTER (WHERE rl.rating = 1) AS "fails",
+             COUNT(*) FILTER (WHERE rl.rating >= 3) AS "passes"
+      FROM review_logs rl
+      JOIN cards c ON c.id = rl."cardId"
+      JOIN decks d ON d.id = c."deckId"
+      WHERE d."userId" = ${userId} AND c."deletedAt" IS NULL
+      GROUP BY rl."cardId"
+    `;
+    const stats = new Map(agg.map((r) => [r.cardId, { total: Number(r.total), fails: Number(r.fails), passes: Number(r.passes) }]));
+    const reviewedIds = [...stats.keys()];
+
+    // Candidate filter per focus type.
+    const where: Prisma.CardWhereInput = { deck: { userId }, deletedAt: null };
+    switch (opts.type) {
+      case "weak-grammar":
+        where.cardType = "grammar";
+        where.id = { in: reviewedIds };
+        break;
+      case "weak-vocab":
+        where.cardType = "vocab";
+        where.id = { in: reviewedIds };
+        break;
+      case "top-failures":
+        where.id = { in: reviewedIds };
+        break;
+      case "jlpt":
+        if (opts.jlpt) where.jlptLevel = opts.jlpt;
+        break;
+      case "frequency": {
+        const ranges: Record<string, Prisma.IntNullableFilter> = {
+          top1k: { gte: 1, lte: 1000 },
+          top3k: { gte: 1001, lte: 3000 },
+          top5k: { gte: 3001, lte: 5000 },
+          "5kplus": { gt: 5000 },
+        };
+        where.frequency = ranges[opts.band ?? "top1k"] ?? ranges.top1k;
+        break;
+      }
+      default:
+        where.id = { in: reviewedIds };
+    }
+    const cards = await db.card.findMany({ where, include: { schedule: true } });
+
+    const score = (id: string) => {
+      const s = stats.get(id);
+      if (!s) return { weakness: 0, retention: 1 };
+      return { weakness: s.fails * 2 + (s.total - s.passes), retention: s.total ? s.passes / s.total : 1 };
+    };
+
+    return cards
+      .map((c) => ({ card: c, ...score(c.id) }))
+      .sort(
+        (a, b) =>
+          b.weakness - a.weakness ||
+          a.retention - b.retention ||
+          new Date(a.card.schedule?.dueDate ?? 0).getTime() - new Date(b.card.schedule?.dueDate ?? 0).getTime()
+      )
+      .slice(0, take)
+      .map((x) => ({ ...x.card, weaknessScore: x.weakness }));
+  }
+
   async getDueCards(userId: string, limit: number = 20) {
     const take = Math.min(Math.max(limit, 1), DUE_LIMIT_MAX);
     return await db.card.findMany({

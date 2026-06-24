@@ -51,6 +51,25 @@ export const getDueCards = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+/** Focus Review Sessions (Phase 40) — targeted, weakness-ordered cards. */
+export const getFocusCards = async (
+  req: Request<{}, {}, {}, { type?: string; jlpt?: string; band?: string; limit?: string }>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const cards = await reviewService.getFocusCards(req.user!.id, {
+      type: req.query.type ?? "top-failures",
+      jlpt: req.query.jlpt,
+      band: req.query.band,
+      limit: req.query.limit ? parseInt(req.query.limit) : 20,
+    });
+    res.json(cards);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const submitReview = async (
   req: Request<{}, {}, SubmitReviewInput>,
   res: Response,
