@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { AppError } from "../lib/errors/AppError.js";
 
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, _res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
@@ -21,8 +21,9 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     req.user = decoded;
     next();
   } catch (error) {
+    // Route through the central handler for a version-consistent shape.
     if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: "Invalid token" });
+      return next(new AppError(401, "Invalid token", "INVALID_TOKEN"));
     }
     next(error);
   }

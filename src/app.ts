@@ -1,8 +1,9 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, Router } from "express";
 import cors from "cors";
 import { env } from "./config/env.js";
 import logger from "./config/logger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { AppError } from "./lib/errors/AppError.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { userRoutes } from "./modules/users/user.routes.js";
@@ -33,19 +34,32 @@ export const createApp = () => {
     res.json({ status: "ok" });
   });
 
-  app.use("/api/auth", authRoutes);
-  app.use("/api/users", userRoutes);
-  app.use("/api/decks", deckRoutes);
-  app.use("/api/cards", cardRoutes);
-  app.use("/api/reviews", reviewRoutes);
-  app.use("/api/dictionary", dictionaryRoutes);
-  app.use("/api/integrations", integrationRoutes);
-  app.use("/api/sync", syncRoutes);
-  app.use("/api/telemetry", telemetryRoutes);
-  app.use("/api/media", mediaRoutes);
+  // Single source-of-truth API router. Mounted at the unversioned `/api`
+  // (legacy, backward compatible) AND `/api/v1` (frozen contract — Phase 28.3).
+  // Adding a future `/api/v2` is one more mount of a separate router; v1 stays
+  // unchanged.
+  const apiRouter = (): Router => {
+    const r = Router();
+    r.use("/auth", authRoutes);
+    r.use("/users", userRoutes);
+    r.use("/decks", deckRoutes);
+    r.use("/cards", cardRoutes);
+    r.use("/reviews", reviewRoutes);
+    r.use("/dictionary", dictionaryRoutes);
+    r.use("/integrations", integrationRoutes);
+    r.use("/sync", syncRoutes);
+    r.use("/telemetry", telemetryRoutes);
+    r.use("/media", mediaRoutes);
+    return r;
+  };
 
-  app.use((req: Request, res: Response) => {
-    res.status(404).json({ error: "Not found" });
+  const v1 = apiRouter();
+  app.use("/api/v1", v1); // frozen versioned contract
+  app.use("/api", v1); // legacy alias → identical behavior
+  // Future: app.use("/api/v2", apiRouterV2());
+
+  app.use((req: Request, _res: Response, next) => {
+    next(new AppError(404, "Not found", "NOT_FOUND"));
   });
 
   app.use(errorHandler);

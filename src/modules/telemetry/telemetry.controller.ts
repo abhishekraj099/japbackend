@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { telemetryService } from "./telemetry.service.js";
 import { telemetryIngestSchema, healthIngestSchema } from "./telemetry.types.js";
+import { AppError } from "../../lib/errors/AppError.js";
 
 export const ingest = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -33,7 +34,7 @@ export const metrics = async (
 export const recordHealth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = healthIngestSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid health payload" });
+    if (!parsed.success) throw new AppError(400, "Invalid health payload", "VALIDATION_ERROR", parsed.error.issues);
     await telemetryService.recordHealth(parsed.data);
     res.status(201).json({ recorded: parsed.data.results.length });
   } catch (error) {

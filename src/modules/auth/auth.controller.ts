@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "./auth.service.js";
 import { RegisterInput, LoginInput } from "./auth.schema.js";
+import { AppError } from "../../lib/errors/AppError.js";
 
 const authService = new AuthService();
 const ua = (req: Request) => req.headers["user-agent"]?.slice(0, 255);
@@ -28,7 +29,7 @@ export const refresh = async (
 ) => {
   try {
     const rt = req.body?.refreshToken;
-    if (!rt) return res.status(400).json({ error: "refreshToken required" });
+    if (!rt) throw new AppError(400, "refreshToken required", "REFRESH_REQUIRED");
     res.json(await authService.refresh(rt, ua(req)));
   } catch (error) {
     next(error);
