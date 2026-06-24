@@ -121,6 +121,19 @@ export class CardService {
     });
   }
 
+  /**
+   * Reset learning progress (Phase 52). Returns the card's schedule to a "new"
+   * state (reps 0, stability 0, due now) WITHOUT touching the FSRS algorithm —
+   * difficulty + lapse history are preserved. Uses the existing schedule path.
+   */
+  async resetSchedule(cardId: string) {
+    await this.getById(cardId); // 404 / ownership-adjacent guard
+    return db.cardSchedule.update({
+      where: { cardId },
+      data: { reps: 0, stability: 0, state: "new", dueDate: new Date(), lastReviewAt: null },
+    });
+  }
+
   /** Soft-delete (Phase 28.2): set the tombstone so the deletion propagates via
    *  sync. Media objects are NOT removed here — object cleanup is deferred to an
    *  async background purge while the row still references the URLs. */

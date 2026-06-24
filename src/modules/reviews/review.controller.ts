@@ -53,7 +53,7 @@ export const getDueCards = async (req: Request, res: Response, next: NextFunctio
 
 /** Focus Review Sessions (Phase 40) — targeted, weakness-ordered cards. */
 export const getFocusCards = async (
-  req: Request<{}, {}, {}, { type?: string; jlpt?: string; band?: string; limit?: string }>,
+  req: Request<{}, {}, {}, { type?: string; jlpt?: string; band?: string; limit?: string; exclude?: string }>,
   res: Response,
   next: NextFunction
 ) => {
@@ -63,6 +63,7 @@ export const getFocusCards = async (
       jlpt: req.query.jlpt,
       band: req.query.band,
       limit: req.query.limit ? parseInt(req.query.limit) : 20,
+      exclude: req.query.exclude ? req.query.exclude.split(",").filter(Boolean) : undefined,
     });
     res.json(cards);
   } catch (error) {

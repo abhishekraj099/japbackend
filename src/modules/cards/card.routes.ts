@@ -32,3 +32,5 @@ cardRoutes.get("/deck/:deckId", cardController.getByDeck);
 cardRoutes.get("/:id", validate(z.object({ id: z.string() }), "params"), cardController.getById);
 cardRoutes.patch("/:id", validate(updateCardSchema), cardController.update);
 cardRoutes.delete("/:id", cardController.remove);
+// Reset learning progress (Phase 52) — leech recovery.
+cardRoutes.post("/:id/reset", cardController.reset);

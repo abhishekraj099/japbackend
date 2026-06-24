@@ -158,3 +158,12 @@ export const remove = async (
     next(error);
   }
 };
+
+/** Reset a card's learning progress (Phase 52). */
+export const reset = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+  try {
+    res.json(await cardService.resetSchedule(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+};

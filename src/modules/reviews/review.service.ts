@@ -35,7 +35,7 @@ export class ReviewService {
    */
   async getFocusCards(
     userId: string,
-    opts: { type: string; jlpt?: string; band?: string; limit?: number }
+    opts: { type: string; jlpt?: string; band?: string; limit?: number; exclude?: string[] }
   ) {
     const take = Math.min(Math.max(opts.limit ?? 20, 1), DUE_LIMIT_MAX);
 
@@ -81,27 +81,40 @@ export class ReviewService {
         where.frequency = ranges[opts.band ?? "top1k"] ?? ranges.top1k;
         break;
       }
+      case "leeches": {
+        // Leech rule (Phase 51/52): reviews >= 8 AND retention < 60%.
+        const leechIds = reviewedIds.filter((id) => {
+          const s = stats.get(id)!;
+          return s.total >= 8 && s.passes / s.total < 0.6;
+        });
+        where.id = { in: leechIds };
+        break;
+      }
       default:
         where.id = { in: reviewedIds };
     }
-    const cards = await db.card.findMany({ where, include: { schedule: true } });
+    const exclude = new Set(opts.exclude ?? []); // client-side suspensions (Phase 52)
+    const cards = (await db.card.findMany({ where, include: { schedule: true } })).filter((c) => !exclude.has(c.id));
 
     const score = (id: string) => {
       const s = stats.get(id);
-      if (!s) return { weakness: 0, retention: 1 };
-      return { weakness: s.fails * 2 + (s.total - s.passes), retention: s.total ? s.passes / s.total : 1 };
+      if (!s) return { weakness: 0, retention: 1, fails: 0 };
+      return { weakness: s.fails * 2 + (s.total - s.passes), retention: s.total ? s.passes / s.total : 1, fails: s.fails };
     };
 
-    return cards
-      .map((c) => ({ card: c, ...score(c.id) }))
-      .sort(
+    const scored = cards.map((c) => ({ card: c, ...score(c.id) }));
+    if (opts.type === "leeches") {
+      // Lowest retention first, then highest fail count.
+      scored.sort((a, b) => a.retention - b.retention || b.fails - a.fails);
+    } else {
+      scored.sort(
         (a, b) =>
           b.weakness - a.weakness ||
           a.retention - b.retention ||
           new Date(a.card.schedule?.dueDate ?? 0).getTime() - new Date(b.card.schedule?.dueDate ?? 0).getTime()
-      )
-      .slice(0, take)
-      .map((x) => ({ ...x.card, weaknessScore: x.weakness }));
+      );
+    }
+    return scored.slice(0, take).map((x) => ({ ...x.card, weaknessScore: x.weakness }));
   }
 
   async getDueCards(userId: string, limit: number = 20) {
