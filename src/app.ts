@@ -15,6 +15,7 @@ import { integrationRoutes } from "./modules/integrations/integration.routes.js"
 import { syncRoutes } from "./modules/sync/sync.routes.js";
 import { telemetryRoutes } from "./modules/telemetry/telemetry.routes.js";
 import { mediaRoutes } from "./modules/media/media.routes.js";
+import { analyticsRoutes } from "./modules/analytics/analytics.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -50,6 +51,7 @@ export const createApp = () => {
     r.use("/sync", syncRoutes);
     r.use("/telemetry", telemetryRoutes);
     r.use("/media", mediaRoutes);
+    r.use("/analytics", analyticsRoutes);
     return r;
   };
 
