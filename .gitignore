@@ -24,4 +24,4 @@ PROPOSED_SCHEMA.prisma.preview
 STRUCTURE_DETAILS.md
 combined.log
 error.log
-data/
+/data/
