@@ -16,9 +16,15 @@ import { syncRoutes } from "./modules/sync/sync.routes.js";
 export const createApp = () => {
   const app = express();
 
+  // Trust one proxy hop (PaaS/load balancer) so rate-limiting + req.ip use the
+  // real client IP rather than the proxy's (Phase 25E fix).
+  app.set("trust proxy", 1);
+
   const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
   app.use(cors({ origin: allowedOrigins }));
-  app.use(express.json());
+  // Card saves carry base64 image/audio data URLs (Phase 24/25D); the default
+  // 100kb body limit rejected them with 413. Raise to cover capped media sizes.
+  app.use(express.json({ limit: "6mb" }));
   app.use(apiLimiter);
 
   app.get("/health", (req: Request, res: Response) => {
