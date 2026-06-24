@@ -19,6 +19,7 @@ import { analyticsRoutes } from "./modules/analytics/analytics.routes.js";
 import { coverageRoutes } from "./modules/coverage/coverage.routes.js";
 import { missionRoutes } from "./modules/missions/mission.routes.js";
 import { achievementRoutes } from "./modules/achievements/achievement.routes.js";
+import { roadmapRoutes } from "./modules/roadmap/roadmap.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -58,6 +59,7 @@ export const createApp = () => {
     r.use("/coverage", coverageRoutes);
     r.use("/missions", missionRoutes);
     r.use("/achievements", achievementRoutes);
+    r.use("/roadmap", roadmapRoutes);
     return r;
   };
 
