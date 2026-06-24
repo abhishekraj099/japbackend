@@ -70,7 +70,7 @@ export class DeckIntelligenceService {
         if (!st || st.total < LEECH_REVIEWS) return null;
         const ret = pct(st.passes, st.total);
         if (ret >= LEECH_RETENTION) return null;
-        return { word: s.card.question, reviewCount: st.total, failCount: st.fails, retention: ret };
+        return { id: s.cardId, word: s.card.question, reviewCount: st.total, failCount: st.fails, retention: ret };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
       .sort((a, b) => b.failCount - a.failCount)
