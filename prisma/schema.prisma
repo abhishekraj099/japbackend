@@ -6,11 +6,19 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Plan {
+  FREE
+  PREMIUM
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
   passwordHash String
+
+  // Subscription plan (Phase 26B). Drives AI daily quota; no billing yet.
+  plan         Plan     @default(FREE)
 
   decks        Deck[]
   integrations Integration[]

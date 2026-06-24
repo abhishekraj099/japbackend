@@ -16,6 +16,9 @@ const envSchema = z.object({
   // AI provider layer (Phase 26A). Gemini is the only live provider today.
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+  // AI daily quota by plan (Phase 26B) — cache misses / provider calls per day.
+  AI_FREE_DAILY_LIMIT: z.coerce.number().default(20),
+  AI_PREMIUM_DAILY_LIMIT: z.coerce.number().default(200),
 });
 
 export const env = envSchema.parse(process.env);
