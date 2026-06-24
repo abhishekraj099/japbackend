@@ -11,6 +11,22 @@ enum Plan {
   PREMIUM
 }
 
+// Provider telemetry (Phase 25I.2). Pre-aggregated daily counters keyed by
+// (date, platform, event) — NOT raw events and NOT tied to any user → minimal
+// storage (≤ ~65 rows/day) and zero PII. Independent of study/review/cards.
+model TelemetryDaily {
+  id        String   @id @default(cuid())
+  date      String // server date, YYYY-MM-DD
+  platform  String // youtube | netflix | viki | ai | other
+  event     String // provider_matched | cue_extracted | ...
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, platform, event])
+  @@index([date])
+  @@map("telemetry_daily")
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
