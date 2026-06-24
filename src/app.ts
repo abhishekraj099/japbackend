@@ -17,6 +17,7 @@ import { telemetryRoutes } from "./modules/telemetry/telemetry.routes.js";
 import { mediaRoutes } from "./modules/media/media.routes.js";
 import { analyticsRoutes } from "./modules/analytics/analytics.routes.js";
 import { coverageRoutes } from "./modules/coverage/coverage.routes.js";
+import { missionRoutes } from "./modules/missions/mission.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -54,6 +55,7 @@ export const createApp = () => {
     r.use("/media", mediaRoutes);
     r.use("/analytics", analyticsRoutes);
     r.use("/coverage", coverageRoutes);
+    r.use("/missions", missionRoutes);
     return r;
   };
 
