@@ -37,3 +37,26 @@ export const telemetryIngestSchema = z.object({
 });
 
 export type TelemetryIngest = z.infer<typeof telemetryIngestSchema>;
+
+// ── Synthetic provider health checks (Phase 25I.3) ───────────────────────────
+export const HEALTH_PROVIDERS = ["youtube", "netflix", "viki"] as const;
+export type HealthProvider = (typeof HEALTH_PROVIDERS)[number];
+
+export const healthIngestSchema = z.object({
+  results: z
+    .array(
+      z.object({
+        provider: z.enum(HEALTH_PROVIDERS),
+        healthy: z.boolean(),
+        checksPassed: z.number().int().min(0).max(100),
+        checksFailed: z.number().int().min(0).max(100),
+      })
+    )
+    .min(1)
+    .max(20),
+});
+export type HealthIngest = z.infer<typeof healthIngestSchema>;
+
+// Alert thresholds (consecutive failed runs).
+export const ALERT_WARNING = 2;
+export const ALERT_CRITICAL = 5;

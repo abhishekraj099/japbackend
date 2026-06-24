@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { telemetryService } from "./telemetry.service.js";
-import { telemetryIngestSchema } from "./telemetry.types.js";
+import { telemetryIngestSchema, healthIngestSchema } from "./telemetry.types.js";
 
 export const ingest = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -24,6 +24,31 @@ export const metrics = async (
   try {
     const days = Math.min(Math.max(parseInt(req.query.days ?? "7", 10) || 7, 1), 90);
     res.json(await telemetryService.metrics(days));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── Synthetic provider health checks (Phase 25I.3) ───────────────────────────
+export const recordHealth = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = healthIngestSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid health payload" });
+    await telemetryService.recordHealth(parsed.data);
+    res.status(201).json({ recorded: parsed.data.results.length });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const healthMetrics = async (
+  req: Request<{}, {}, {}, { days?: string }>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const days = Math.min(Math.max(parseInt(req.query.days ?? "14", 10) || 14, 1), 90);
+    res.json(await telemetryService.healthMetrics(days));
   } catch (error) {
     next(error);
   }

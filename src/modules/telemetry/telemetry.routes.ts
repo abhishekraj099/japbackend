@@ -9,3 +9,7 @@ export const telemetryRoutes = Router();
 telemetryRoutes.post("/", aiLimiter, authenticate, telemetryController.ingest);
 // Dashboard metrics (operational visibility).
 telemetryRoutes.get("/metrics", authenticate, telemetryController.metrics);
+
+// Synthetic provider health checks (Phase 25I.3).
+telemetryRoutes.post("/health", aiLimiter, authenticate, telemetryController.recordHealth);
+telemetryRoutes.get("/health", authenticate, telemetryController.healthMetrics);

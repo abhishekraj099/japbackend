@@ -27,6 +27,20 @@ model TelemetryDaily {
   @@map("telemetry_daily")
 }
 
+// Synthetic provider monitoring (Phase 25I.3). One row per health-check run per
+// provider (daily / CI). Independent of real-user telemetry. Tiny footprint.
+model ProviderHealthCheck {
+  id           String   @id @default(cuid())
+  provider     String // youtube | netflix | viki
+  healthy      Boolean
+  checksPassed Int
+  checksFailed Int
+  createdAt    DateTime @default(now())
+
+  @@index([provider, createdAt])
+  @@map("provider_health_checks")
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique

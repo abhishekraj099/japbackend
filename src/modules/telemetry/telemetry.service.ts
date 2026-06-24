@@ -1,5 +1,12 @@
 import { db } from "../../config/database.js";
-import { TELEMETRY_PLATFORMS, type TelemetryIngest } from "./telemetry.types.js";
+import {
+  TELEMETRY_PLATFORMS,
+  HEALTH_PROVIDERS,
+  ALERT_WARNING,
+  ALERT_CRITICAL,
+  type TelemetryIngest,
+  type HealthIngest,
+} from "./telemetry.types.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
@@ -71,6 +78,51 @@ class TelemetryService {
         quotaExceeded: aiQuota,
         quotaFailureRatePct: pct(aiQuota, aiFallback + aiQuota),
       },
+    };
+  }
+
+  // ── Synthetic health checks (Phase 25I.3) ──────────────────────────────────
+  async recordHealth(payload: HealthIngest): Promise<void> {
+    await db.providerHealthCheck.createMany({ data: payload.results });
+  }
+
+  /** Per-provider monitoring summary + alert level over the last `days`. */
+  async healthMetrics(days: number) {
+    const since = new Date(Date.now() - days * 86400000);
+    const rows = await db.providerHealthCheck.findMany({
+      where: { createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+      select: { provider: true, healthy: true, checksPassed: true, checksFailed: true, createdAt: true },
+    });
+
+    const providers = HEALTH_PROVIDERS.map((provider) => {
+      const runs = rows.filter((r) => r.provider === provider); // newest first
+      const total = runs.length;
+      const healthyCount = runs.filter((r) => r.healthy).length;
+      const lastSuccessfulCheck = runs.find((r) => r.healthy)?.createdAt ?? null;
+      let consecutiveFailures = 0;
+      for (const r of runs) {
+        if (r.healthy) break;
+        consecutiveFailures++;
+      }
+      const alertLevel =
+        consecutiveFailures >= ALERT_CRITICAL ? "critical" : consecutiveFailures >= ALERT_WARNING ? "warning" : "ok";
+      return {
+        provider,
+        totalChecks: total,
+        uptimePct: pct(healthyCount, total),
+        lastSuccessfulCheck,
+        lastChecked: runs[0]?.createdAt ?? null,
+        consecutiveFailures,
+        alertLevel,
+      };
+    });
+
+    return {
+      rangeDays: days,
+      providers,
+      unhealthyProviders: providers.filter((p) => p.alertLevel !== "ok").map((p) => p.provider),
+      thresholds: { warning: ALERT_WARNING, critical: ALERT_CRITICAL },
     };
   }
 }
