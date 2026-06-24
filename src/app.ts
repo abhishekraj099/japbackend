@@ -18,6 +18,7 @@ import { mediaRoutes } from "./modules/media/media.routes.js";
 import { analyticsRoutes } from "./modules/analytics/analytics.routes.js";
 import { coverageRoutes } from "./modules/coverage/coverage.routes.js";
 import { missionRoutes } from "./modules/missions/mission.routes.js";
+import { achievementRoutes } from "./modules/achievements/achievement.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -56,6 +57,7 @@ export const createApp = () => {
     r.use("/analytics", analyticsRoutes);
     r.use("/coverage", coverageRoutes);
     r.use("/missions", missionRoutes);
+    r.use("/achievements", achievementRoutes);
     return r;
   };
 
