@@ -50,13 +50,35 @@ model User {
   // Subscription plan (Phase 26B). Drives AI daily quota; no billing yet.
   plan         Plan     @default(FREE)
 
-  decks        Deck[]
-  integrations Integration[]
+  decks         Deck[]
+  integrations  Integration[]
+  refreshTokens RefreshToken[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@map("users")
+}
+
+// Refresh-token sessions (Phase 28.1). One row per issued refresh token; the
+// raw token is never stored (only its SHA-256 hash). Rotation links old→new via
+// replacedById within a familyId; presenting a revoked token revokes the whole
+// family (reuse detection).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  familyId     String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 // External integration connections (e.g. Anki, future cloud storage). Provider

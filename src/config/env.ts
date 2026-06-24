@@ -6,7 +6,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),
-  JWT_EXPIRE: z.string().default("7d"),
+  JWT_EXPIRE: z.string().default("7d"), // legacy; superseded by ACCESS_TOKEN_TTL
+  // Auth hardening (Phase 28.1).
+  ACCESS_TOKEN_TTL: z.string().default("15m"),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(30),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   // AI fallback lookup (Phase 18A). Optional — when unset the AI endpoint
