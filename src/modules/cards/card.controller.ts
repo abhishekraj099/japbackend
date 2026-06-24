@@ -38,6 +38,15 @@ export const getSavedGrammar = async (
   }
 };
 
+/** Grammar Library bulk load (Phase 38). */
+export const getGrammarLibrary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ items: await cardService.getGrammarLibrary(req.user!.id) });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createSentence = async (
   req: Request<{}, {}, CreateSentenceCardInput>,
   res: Response,

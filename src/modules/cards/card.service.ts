@@ -243,6 +243,45 @@ export class CardService {
     }
   }
 
+  /**
+   * Grammar Library (Phase 38). Bulk-load every grammar card the user has saved
+   * with its FSRS schedule + last-review timestamp, in one query. Read-only;
+   * reuses the shared card table and the "grammar" cardType — no schema change,
+   * no FSRS/review change. Status/due derivation happens client-side.
+   */
+  async getGrammarLibrary(userId: string) {
+    const rows = await db.card.findMany({
+      where: { cardType: "grammar", deck: { userId }, deletedAt: null },
+      select: {
+        id: true,
+        question: true, // pattern name
+        answer: true, // meaning
+        grammarNotes: true,
+        jlptLevel: true,
+        patternId: true,
+        examples: true,
+        createdAt: true,
+        schedule: {
+          select: { state: true, dueDate: true, stability: true, difficulty: true, reps: true, lapses: true },
+        },
+        reviewLogs: { select: { reviewedAt: true }, orderBy: { reviewedAt: "desc" }, take: 1 },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      pattern: r.question,
+      meaning: r.answer,
+      detail: r.grammarNotes,
+      jlptLevel: r.jlptLevel,
+      patternId: r.patternId,
+      examples: r.examples,
+      createdAt: r.createdAt,
+      schedule: r.schedule,
+      lastReviewedAt: r.reviewLogs[0]?.reviewedAt ?? null,
+    }));
+  }
+
   /** patternIds of all grammar cards the user has saved — powers the
    *  extension's "Saved ✓" state without leaking full card rows. */
   async getSavedGrammarPatternIds(userId: string): Promise<string[]> {
