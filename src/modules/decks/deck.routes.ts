@@ -12,5 +12,7 @@ deckRoutes.use(authenticate);
 deckRoutes.post("/", validate(createDeckSchema), deckController.create);
 deckRoutes.get("/", deckController.getAll);
 deckRoutes.get("/:id", validate(z.object({ id: z.string() }), "params"), deckController.getById);
+// Deck Intelligence (Phase 51) — read-only health/difficulty/forecast.
+deckRoutes.get("/:id/intelligence", deckController.getIntelligence);
 deckRoutes.patch("/:id", validate(updateDeckSchema), deckController.update);
 deckRoutes.delete("/:id", deckController.remove);

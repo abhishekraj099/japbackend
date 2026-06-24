@@ -1,8 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import { DeckService } from "./deck.service.js";
+import { deckIntelligenceService } from "./deck-intelligence.service.js";
 import { CreateDeckInput, UpdateDeckInput } from "./deck.schema.js";
 
 const deckService = new DeckService();
+
+export const getIntelligence = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+  try {
+    res.json(await deckIntelligenceService.getIntelligence(req.params.id, req.user!.id));
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const create = async (
   req: Request<{}, {}, CreateDeckInput>,
