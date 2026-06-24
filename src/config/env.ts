@@ -19,6 +19,15 @@ const envSchema = z.object({
   // AI daily quota by plan (Phase 26B) — cache misses / provider calls per day.
   AI_FREE_DAILY_LIMIT: z.coerce.number().default(20),
   AI_PREMIUM_DAILY_LIMIT: z.coerce.number().default(200),
+  // Media object storage (Phase 27). When SUPABASE_URL + SUPABASE_SERVICE_KEY
+  // are set, card screenshots/audio are uploaded to Supabase Storage and only a
+  // public URL is stored. When unset, the extension keeps inlining data URLs
+  // (legacy behavior) — fully backward compatible.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_KEY: z.string().optional(),
+  SUPABASE_MEDIA_BUCKET: z.string().default("card-media"),
+  MEDIA_IMAGE_MAX_BYTES: z.coerce.number().default(2_000_000),
+  MEDIA_AUDIO_MAX_BYTES: z.coerce.number().default(1_500_000),
 });
 
 export const env = envSchema.parse(process.env);

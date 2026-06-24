@@ -13,6 +13,7 @@ import { dictionaryRoutes } from "./modules/dictionary/dictionary.routes.js";
 import { integrationRoutes } from "./modules/integrations/integration.routes.js";
 import { syncRoutes } from "./modules/sync/sync.routes.js";
 import { telemetryRoutes } from "./modules/telemetry/telemetry.routes.js";
+import { mediaRoutes } from "./modules/media/media.routes.js";
 
 export const createApp = () => {
   const app = express();
@@ -41,6 +42,7 @@ export const createApp = () => {
   app.use("/api/integrations", integrationRoutes);
   app.use("/api/sync", syncRoutes);
   app.use("/api/telemetry", telemetryRoutes);
+  app.use("/api/media", mediaRoutes);
 
   app.use((req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });

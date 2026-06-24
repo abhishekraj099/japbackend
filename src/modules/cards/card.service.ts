@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../config/database.js";
 import { AppError } from "../../lib/errors/AppError.js";
+import { deleteByUrl } from "../media/media.service.js";
 import {
   CreateCardInput,
   UpdateCardInput,
@@ -111,8 +112,12 @@ export class CardService {
   }
 
   async delete(cardId: string) {
-    await this.getById(cardId);
+    const card = await this.getById(cardId);
     await db.card.delete({ where: { id: cardId } });
+    // Best-effort cleanup of managed object-storage media (Phase 27). Legacy
+    // inline data URLs are ignored by isManagedUrl(); failures never block.
+    void deleteByUrl(card.imageUrl);
+    void deleteByUrl(card.audioUrl);
   }
 
   /** Resolve the target deck: the provided id (must belong to the user) or,
