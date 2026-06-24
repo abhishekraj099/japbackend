@@ -115,8 +115,12 @@ model Deck {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  // Soft-delete tombstone (Phase 28.2). Null = live; set = deleted, propagated
+  // to clients via GET /sync so offline devices remove the local record.
+  deletedAt   DateTime?
 
   @@index([userId])
+  @@index([deletedAt])
   @@map("decks")
 }
 
@@ -174,9 +178,13 @@ model Card {
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  // Soft-delete tombstone (Phase 28.2). Null = live; set = deleted. Live reads
+  // filter deletedAt: null; sync propagates deleted ids by cardType.
+  deletedAt       DateTime?
 
   @@index([deckId])
   @@index([cardType])
+  @@index([deletedAt])
   // Database-level dedup (Phase 21A). Replaces app-level check-then-insert.
   // Vocabulary/sentence: one (deck, type, question). Grammar: one (deck, type,
   // patternId) — patternId is NULL for non-grammar so those rows never collide

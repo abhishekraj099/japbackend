@@ -32,6 +32,7 @@ export class ReviewService {
     return await db.card.findMany({
       where: {
         deck: { userId },
+        deletedAt: null, // exclude tombstoned cards (Phase 28.2)
         schedule: {
           dueDate: { lte: new Date() },
         },
@@ -112,7 +113,7 @@ export class ReviewService {
 
   /** Dashboard metrics (Phase 21E). */
   async getStats(userId: string) {
-    const cardWhere = { deck: { userId } };
+    const cardWhere = { deck: { userId }, deletedAt: null }; // live cards only (Phase 28.2)
     const [totalCards, vocabCount, grammarCount, sentenceCount, totalReviews] = await Promise.all([
       db.card.count({ where: cardWhere }),
       db.card.count({ where: { ...cardWhere, cardType: "vocab" } }),

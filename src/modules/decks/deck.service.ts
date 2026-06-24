@@ -14,13 +14,14 @@ export class DeckService {
 
   async getAll(userId: string) {
     return await db.deck.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       select: {
         id: true,
         name: true,
         description: true,
         language: true,
-        _count: { select: { cards: true } },
+        // Count live cards only (Phase 28.2).
+        _count: { select: { cards: { where: { deletedAt: null } } } },
         createdAt: true,
       },
     });
@@ -28,7 +29,7 @@ export class DeckService {
 
   async getById(deckId: string, userId: string) {
     const deck = await db.deck.findFirst({
-      where: { id: deckId, userId },
+      where: { id: deckId, userId, deletedAt: null },
     });
 
     if (!deck) {
@@ -46,8 +47,14 @@ export class DeckService {
     });
   }
 
+  /** Soft-delete the deck and cascade-tombstone its live cards (Phase 28.2), so
+   *  both the deck and its cards propagate as deletions via sync. */
   async delete(deckId: string, userId: string) {
     const deck = await this.getById(deckId, userId);
-    await db.deck.delete({ where: { id: deck.id } });
+    const now = new Date();
+    await db.$transaction([
+      db.card.updateMany({ where: { deckId: deck.id, deletedAt: null }, data: { deletedAt: now } }),
+      db.deck.update({ where: { id: deck.id }, data: { deletedAt: now } }),
+    ]);
   }
 }

@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../../config/database.js";
 import { AppError } from "../../lib/errors/AppError.js";
-import { deleteByUrl } from "../media/media.service.js";
 import {
   CreateCardInput,
   UpdateCardInput,
@@ -43,17 +42,28 @@ export class CardService {
         const existing = await db.card.findFirst({
           where: { deckId: input.deckId, cardType: "vocab", question: input.question },
         });
-        if (existing) return { card: existing, alreadySaved: true };
+        if (existing) return this.reviveOrExisting(existing.id, existing.deletedAt, { ...rest, tags: tags || [] });
       }
       throw e;
     }
+  }
+
+  /** A soft-deleted duplicate (Phase 28.2) is revived in place (clears the
+   *  tombstone + refreshes content); a live duplicate is returned as-is. */
+  private async reviveOrExisting(id: string, deletedAt: Date | null, data: Prisma.CardUpdateInput) {
+    if (!deletedAt) {
+      const existing = await db.card.findUnique({ where: { id } });
+      return { card: existing!, alreadySaved: true };
+    }
+    const card = await db.card.update({ where: { id }, data: { ...data, deletedAt: null } });
+    return { card, alreadySaved: false };
   }
 
   /** Questions (words) of all vocab cards the user has saved — powers the
    *  extension's vocab "Saved ✓" state. */
   async getSavedWords(userId: string): Promise<string[]> {
     const rows = await db.card.findMany({
-      where: { cardType: "vocab", deck: { userId } },
+      where: { cardType: "vocab", deck: { userId }, deletedAt: null },
       select: { question: true },
       distinct: ["question"],
     });
@@ -67,7 +77,7 @@ export class CardService {
    */
   async getWordStatus(userId: string): Promise<{ known: string[]; learning: string[] }> {
     const rows = await db.card.findMany({
-      where: { cardType: "vocab", deck: { userId } },
+      where: { cardType: "vocab", deck: { userId }, deletedAt: null },
       select: { question: true, schedule: { select: { stability: true } } },
     });
     const known = new Set<string>();
@@ -90,11 +100,11 @@ export class CardService {
       throw new AppError(404, "Deck not found", "DECK_NOT_FOUND");
     }
 
-    return await db.card.findMany({ where: { deckId } });
+    return await db.card.findMany({ where: { deckId, deletedAt: null } });
   }
 
   async getById(cardId: string) {
-    const card = await db.card.findUnique({ where: { id: cardId } });
+    const card = await db.card.findFirst({ where: { id: cardId, deletedAt: null } });
 
     if (!card) {
       throw new AppError(404, "Card not found", "CARD_NOT_FOUND");
@@ -111,13 +121,12 @@ export class CardService {
     });
   }
 
+  /** Soft-delete (Phase 28.2): set the tombstone so the deletion propagates via
+   *  sync. Media objects are NOT removed here — object cleanup is deferred to an
+   *  async background purge while the row still references the URLs. */
   async delete(cardId: string) {
-    const card = await this.getById(cardId);
-    await db.card.delete({ where: { id: cardId } });
-    // Best-effort cleanup of managed object-storage media (Phase 27). Legacy
-    // inline data URLs are ignored by isManagedUrl(); failures never block.
-    void deleteByUrl(card.imageUrl);
-    void deleteByUrl(card.audioUrl);
+    await this.getById(cardId); // 404 if already deleted/missing
+    await db.card.update({ where: { id: cardId }, data: { deletedAt: new Date() } });
   }
 
   /** Resolve the target deck: the provided id (must belong to the user) or,
@@ -170,7 +179,15 @@ export class CardService {
         const existing = await db.card.findFirst({
           where: { deckId: deck.id, cardType: "grammar", patternId: input.patternId },
         });
-        if (existing) return { card: existing, alreadySaved: true };
+        if (existing)
+          return this.reviveOrExisting(existing.id, existing.deletedAt, {
+            answer: input.explanation,
+            grammarNotes: input.detail,
+            jlptLevel: input.jlptLevel,
+            examples: input.examples ?? [],
+            sourceUrl: input.sourceUrl,
+            contextSentence: input.contextSentence,
+          });
       }
       throw e;
     }
@@ -211,7 +228,16 @@ export class CardService {
         const existing = await db.card.findFirst({
           where: { deckId: deck.id, cardType: "sentence", question: input.sentenceText },
         });
-        if (existing) return { card: existing, alreadySaved: true };
+        if (existing)
+          return this.reviveOrExisting(existing.id, existing.deletedAt, {
+            answer: input.translation,
+            reading: input.reading,
+            examples: input.examples ?? [],
+            sourceUrl: input.sourceUrl,
+            contextSentence: input.contextSentence,
+            imageUrl: input.imageUrl,
+            audioUrl: input.audioUrl,
+          });
       }
       throw e;
     }
@@ -221,7 +247,7 @@ export class CardService {
    *  extension's "Saved ✓" state without leaking full card rows. */
   async getSavedGrammarPatternIds(userId: string): Promise<string[]> {
     const rows = await db.card.findMany({
-      where: { cardType: "grammar", deck: { userId }, patternId: { not: null } },
+      where: { cardType: "grammar", deck: { userId }, patternId: { not: null }, deletedAt: null },
       select: { patternId: true },
       distinct: ["patternId"],
     });
