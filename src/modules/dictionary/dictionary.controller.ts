@@ -32,9 +32,17 @@ export const aiSearch = async (
       return res.status(503).json({ error: "AI lookup not configured" });
     }
     const q = req.query.q ?? "";
-    const result = await aiLookup(q, req.user?.id ?? "anonymous");
-    if (!result) return res.status(404).json({ error: "No result" });
-    res.json(result);
+    const out = await aiLookup(q, req.user!.id); // authenticated route → req.user set
+    if (out.quotaExceeded) {
+      return res.status(429).json({ error: "AI quota exceeded", remainingQuota: 0 });
+    }
+    if (!out.result) return res.status(404).json({ error: "No result", remainingQuota: out.remainingQuota });
+    res.json({
+      ...out.result,
+      source: out.source,
+      provider: out.provider ?? "gemini",
+      remainingQuota: out.remainingQuota,
+    });
   } catch (error) {
     next(error);
   }
@@ -53,9 +61,18 @@ export const aiSentenceSearch = async (
     if (!aiLookupAvailable()) {
       return res.status(503).json({ error: "AI lookup not configured" });
     }
-    const result = await aiSentence(req.query.q ?? "", req.user?.id ?? "anonymous");
-    if (!result) return res.status(404).json({ error: "No result" });
-    res.json(result);
+    const out = await aiSentence(req.query.q ?? "", req.user!.id);
+    if (out.quotaExceeded) {
+      return res.status(429).json({ error: "AI quota exceeded", remainingQuota: 0 });
+    }
+    if (!out.ok) return res.status(404).json({ error: "No result", remainingQuota: out.remainingQuota });
+    res.json({
+      reading: out.reading,
+      translation: out.translation,
+      source: out.source,
+      provider: out.provider ?? "gemini",
+      remainingQuota: out.remainingQuota,
+    });
   } catch (error) {
     next(error);
   }

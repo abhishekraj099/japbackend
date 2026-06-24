@@ -14,19 +14,22 @@ function todayUtc(): string {
  */
 export class AiCacheService {
   // ── Word cache ───────────────────────────────────────────────────────────
-  async getWord(normalizedQuery: string): Promise<AIWordResult | null> {
+  async getWord(normalizedQuery: string): Promise<{ result: AIWordResult; provider: string } | null> {
     const row = await db.aiDictionaryEntry.findUnique({
       where: { normalizedQuery_kind: { normalizedQuery, kind: "word" } },
     });
     if (!row) return null;
     await this.touch(row.id);
     return {
-      reading: row.reading,
-      meaning: row.meaning,
-      examples: row.examples,
-      jlptLevel: row.jlptLevel,
-      pitchAccent: row.pitchAccent,
-      category: null,
+      result: {
+        reading: row.reading,
+        meaning: row.meaning,
+        examples: row.examples,
+        jlptLevel: row.jlptLevel,
+        pitchAccent: row.pitchAccent,
+        category: null,
+      },
+      provider: row.provider,
     };
   }
 
@@ -42,13 +45,13 @@ export class AiCacheService {
   }
 
   // ── Sentence cache ─────────────────────────────────────────────────────────
-  async getSentence(normalizedQuery: string): Promise<AISentenceResult | null> {
+  async getSentence(normalizedQuery: string): Promise<{ result: AISentenceResult; provider: string } | null> {
     const row = await db.aiDictionaryEntry.findUnique({
       where: { normalizedQuery_kind: { normalizedQuery, kind: "sentence" } },
     });
     if (!row) return null;
     await this.touch(row.id);
-    return { reading: row.reading, translation: row.meaning };
+    return { result: { reading: row.reading, translation: row.meaning }, provider: row.provider };
   }
 
   async saveSentence(query: string, normalizedQuery: string, r: AISentenceResult, provider: string): Promise<void> {
