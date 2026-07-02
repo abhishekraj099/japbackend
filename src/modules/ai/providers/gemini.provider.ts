@@ -57,46 +57,91 @@ function extractJson<T>(text: string): Partial<T> | null {
   }
 }
 
+/**
+ * RC9.8 — round-robin key pool. Built once from env (GEMINI_API_KEY +
+ * GEMINI_API_KEYS, de-duplicated). A shared, monotonically-incrementing
+ * counter picks the next key on every call, so N keys each receive
+ * (requests / N) hits — a real round robin, not random selection, which
+ * would drift unevenly under low request volume.
+ */
+function buildKeyPool(): string[] {
+  const keys = new Set<string>();
+  if (env.GEMINI_API_KEY) keys.add(env.GEMINI_API_KEY);
+  if (env.GEMINI_API_KEYS) {
+    for (const k of env.GEMINI_API_KEYS.split(",").map((s) => s.trim()).filter(Boolean)) keys.add(k);
+  }
+  return [...keys];
+}
+
+const KEY_POOL = buildKeyPool();
+let rrCounter = 0;
+
+/** Next key in rotation, plus its index (for logging which key handled a
+ *  failure) and the pool size (so callers can bound failover attempts). */
+function nextKey(): { key: string; index: number; poolSize: number } | null {
+  if (!KEY_POOL.length) return null;
+  const index = rrCounter % KEY_POOL.length;
+  rrCounter++;
+  return { key: KEY_POOL[index], index, poolSize: KEY_POOL.length };
+}
+
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
 
   isAvailable(): boolean {
-    return !!env.GEMINI_API_KEY;
+    return KEY_POOL.length > 0;
   }
 
-  /** Single-shot generateContent call. Returns the model text, or null. */
+  /**
+   * Single-shot generateContent call, load-balanced across the key pool.
+   * On a per-key failure (rate limit, invalid key, transient error) it
+   * fails over to the NEXT key in rotation and retries once per remaining
+   * key in the pool, rather than giving up on the first bad key — this is
+   * what makes "add 5 keys" actually improve reliability instead of just
+   * spreading load evenly across keys that individually still fail alone.
+   */
   private async call(system: string, user: string, maxTokens: number): Promise<string | null> {
-    if (!env.GEMINI_API_KEY) return null;
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": env.GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: {
-            temperature: 0,
-            maxOutputTokens: maxTokens,
-            responseMimeType: "application/json",
+    if (!KEY_POOL.length) return null;
+    const attempts = KEY_POOL.length;
+    for (let i = 0; i < attempts; i++) {
+      const picked = nextKey();
+      if (!picked) return null;
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-goog-api-key": picked.key,
           },
-        }),
-      });
-      if (!res.ok) {
-        logger.warn("Gemini HTTP error", { status: res.status });
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts: [{ text: user }] }],
+            generationConfig: {
+              temperature: 0,
+              maxOutputTokens: maxTokens,
+              responseMimeType: "application/json",
+            },
+          }),
+        });
+        if (!res.ok) {
+          logger.warn("Gemini HTTP error", { status: res.status, keyIndex: picked.index, poolSize: picked.poolSize });
+          // 429 (rate limit) or 401/403 (bad key) — try the next key in the
+          // pool instead of failing the whole request on one bad key.
+          if ((res.status === 429 || res.status === 401 || res.status === 403) && i < attempts - 1) continue;
+          return null;
+        }
+        const data = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        return data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      } catch (err) {
+        logger.warn("Gemini call failed", { error: (err as Error).message, keyIndex: picked.index });
+        if (i < attempts - 1) continue; // network error — try next key
         return null;
       }
-      const data = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      return data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-    } catch (err) {
-      logger.warn("Gemini call failed", { error: (err as Error).message });
-      return null;
     }
+    return null;
   }
 
   async lookupWord(query: string): Promise<AIWordResult | null> {

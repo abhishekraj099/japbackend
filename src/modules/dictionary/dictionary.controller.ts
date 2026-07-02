@@ -23,6 +23,21 @@ export const search = async (
 };
 
 /**
+ * AI health check (RC — AI Health Manager). Config + quota snapshot only —
+ * never calls a provider, so it costs nothing and the extension can poll it
+ * freely to answer "is AI usable right now" without burning daily quota on
+ * a real lookup.
+ */
+export const aiHealth = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const health = await aiService.health(req.user!.id);
+    res.json(health);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * AI fallback lookup (Phase 18A). Returns a single AI-generated result, 404
  * when nothing usable was produced, or 503 when AI is not configured.
  */

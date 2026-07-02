@@ -27,6 +27,13 @@ class AIProviderManager {
     return this.providers.some((p) => p.isAvailable());
   }
 
+  /** Name of the first configured provider, or null if none are — used by
+   *  the AI health check so the extension can display which provider is
+   *  actually active without making a real (quota-consuming) request. */
+  activeProviderName(): string | null {
+    return this.providers.find((p) => p.isAvailable())?.name ?? null;
+  }
+
   async lookupWord(query: string): Promise<{ result: AIWordResult; provider: string } | null> {
     for (const p of this.providers) {
       if (!p.isAvailable()) continue;

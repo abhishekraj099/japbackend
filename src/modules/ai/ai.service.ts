@@ -43,9 +43,35 @@ export interface AiGrammarOutcome {
   quotaExceeded: boolean;
 }
 
+export interface AiHealth {
+  configured: boolean;
+  provider: string | null;
+  dailyLimit: number;
+  usedToday: number;
+  remainingToday: number;
+}
+
 class AiService {
   available(): boolean {
     return aiProviderManager.isAvailable();
+  }
+
+  /**
+   * Config + quota snapshot for the AI health check — makes NO provider API
+   * call (so it costs nothing and can be polled freely), unlike a real
+   * lookup which consumes daily quota. Reuses the same quota() helper and
+   * provider-manager the real lookup path already uses.
+   */
+  async health(userId: string): Promise<AiHealth> {
+    const configured = this.available();
+    const { limit, used } = await this.quota(userId);
+    return {
+      configured,
+      provider: configured ? aiProviderManager.activeProviderName() : null,
+      dailyLimit: limit,
+      usedToday: used,
+      remainingToday: Math.max(0, limit - used),
+    };
   }
 
   /** Plan-aware daily limit + today's usage for a user. */

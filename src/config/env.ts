@@ -18,6 +18,11 @@ const envSchema = z.object({
   AI_MODEL: z.string().default("claude-haiku-4-5-20251001"),
   // AI provider layer (Phase 26A). Gemini is the only live provider today.
   GEMINI_API_KEY: z.string().optional(),
+  // RC9.8: optional comma-separated pool of additional Gemini keys for
+  // round-robin load balancing (e.g. "key1,key2,key3,key4,key5"). When set,
+  // GEMINI_API_KEY (if also set) is included as the first key in the pool —
+  // no key is defined twice. Falls back to single-key behavior when unset.
+  GEMINI_API_KEYS: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   // AI daily quota by plan (Phase 26B) — cache misses / provider calls per day.
   AI_FREE_DAILY_LIMIT: z.coerce.number().default(20),
